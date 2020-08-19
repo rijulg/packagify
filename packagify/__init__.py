@@ -84,8 +84,8 @@ class Packagify:
             if name and locals and '__package__' in locals and '__file__' in locals and name in locals['__package__'] and self.__package.__name__ in locals['__file__']:
                 locals['__package__'] = locals['__package__'].replace(
                     f'.{name}', '')
-
-            params['level'] += 1
+            if self.__package.__name__ not in name and self.__package.__name__ in locals['__package__']:
+                params['level'] += 1
             module = self.original_import(name, **params)
         return module
 
