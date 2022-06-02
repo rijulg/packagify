@@ -64,15 +64,17 @@ class Packagify:
                 relative_path += f"/{subpath}"
                 sys.path.append(relative_path)
                 if tmp := self._try_import(name, locs, from_list):
+                    delattr(self, "_end_exception")
+                    self._end_exception = None
                     return tmp
-        raise ModuleNotFoundError
+        raise self._end_exception
 
     def _try_import(self, name, locs, from_list):
         try:
-            tmp = __import__(name=name, locals=locs, fromlist=from_list)
+            return __import__(name=name, locals=locs, fromlist=from_list)
         except ModuleNotFoundError as exception:
-            tmp = None
-        return tmp
+            self._end_exception = exception
+            return None
 
     def __save_originals(self):
         self.original_import = builtins.__import__
