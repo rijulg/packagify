@@ -42,16 +42,36 @@ class Packagify:
         locs = locals()
         locs[self.__package.__name__] = self.__package
         name = f"{self.__package.__name__}.{module}"
-        tmp = __import__(name, locals=locs, fromlist=from_list)
+        tmp = self.module_import_name(module, name, locs, from_list)
         self.__unhijack()
         if from_list:
             modules = ()
             for fl in from_list:
-                modules += (getattr(tmp, fl), )
+                modules += (getattr(tmp, fl),)
             if len(modules) > 1:
                 return modules
             else:
                 return modules[0]
+        return tmp
+
+    def module_import_name(self, module, name, locs, from_list):
+        if tmp := self._try_import(name, locs, from_list):
+            return tmp
+        else:
+            relative_path = self.location
+            relative_subpath = module.split(".")[:-1]
+            for subpath in relative_subpath:
+                relative_path += f"/{subpath}"
+                sys.path.append(relative_path)
+                if tmp := self._try_import(name, locs, from_list):
+                    return tmp
+        raise ModuleNotFoundError
+
+    def _try_import(self, name, locs, from_list):
+        try:
+            tmp = __import__(name=name, locals=locs, fromlist=from_list)
+        except ModuleNotFoundError as exception:
+            tmp = None
         return tmp
 
     def __save_originals(self):
