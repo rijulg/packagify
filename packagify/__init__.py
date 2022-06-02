@@ -65,7 +65,6 @@ class Packagify:
                 sys.path.append(relative_path)
                 if tmp := self._try_import(name, locs, from_list):
                     delattr(self, "_end_exception")
-                    self._end_exception = None
                     return tmp
         raise self._end_exception
 
