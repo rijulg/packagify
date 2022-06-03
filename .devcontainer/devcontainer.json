@@ -1,0 +1,11 @@
+{
+  "name": "packagify",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/home/workspace",
+  "extensions": [
+    "ms-python.python",
+    "eamodio.gitlens",
+    "esbenp.prettier-vscode"
+  ]
+}

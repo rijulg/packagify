@@ -79,15 +79,41 @@ class Packagify:
 
         try:
             module = self.original_import(name, **params)
-        except:
-
-            if name and locals and '__package__' in locals and '__file__' in locals and name in locals['__package__'] and self.__package.__name__ in locals['__file__']:
-                locals['__package__'] = locals['__package__'].replace(
-                    f'.{name}', '')
-            if self.__package.__name__ not in name and self.__package.__name__ in locals['__package__']:
+        except ModuleNotFoundError:
+            try:
+                # Try importing from root package
+                locals['__package__'] = self.__package.__name__
                 params['level'] += 1
-            module = self.original_import(name, **params)
+                module = self.original_import(name, **params)
+            except ModuleNotFoundError:
+                # Fix level change due to root import attempt
+                params['level'] -= 1
+                # Adapt for self import cases
+                if self.__is_trying_to_import_itself_from_parent(name, locals):
+                    locals['__package__'] = locals['__package__'].replace(f'.{name}', '')
+                if self.__is_trying_to_import_without_specifying_parent(name, locals):
+                    params['level'] += 1
+                module = self.original_import(name, **params)
         return module
+
+    def __is_trying_to_import_itself_from_parent(self, name, locals):
+        import_name_is_in_package = (
+            name is not None
+            and locals is not None
+            and '__package__' in locals
+            and name in locals['__package__']
+        )
+        my_package_name_is_in_import_file = (
+            '__file__' in locals
+            and self.__package.__name__ in locals['__file__']
+        )
+        return import_name_is_in_package and my_package_name_is_in_import_file
+
+    def __is_trying_to_import_without_specifying_parent(self, name, locals):
+        return (
+            self.__package.__name__ not in name
+            and self.__package.__name__ in locals['__package__']
+        )
 
     class SysPath(list):
         def __init__(self, args, location):

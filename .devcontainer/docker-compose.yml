@@ -1,0 +1,19 @@
+services:
+  dev:
+    build: .
+    image: packagify
+    # We do not want to recreate the container or have multiple instances of it running ever
+    container_name: packagify
+    volumes:
+      # Mount SSH Keys as readonly
+      - ~/.ssh:/root/.ssh-localhost:ro
+      # Mount Pyirc as readonly
+      - ~/.pypirc:/root/.pypirc:ro
+      # Mount gitconfig
+      - ~/.gitconfig:/root/.gitconfig:ro
+      # Mount working folder
+      - ../:/home/workspace
+    # The following commands ensure that the container stays active
+    entrypoint: bash
+    stdin_open: true
+    tty: true
