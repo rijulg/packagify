@@ -3,9 +3,14 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "dev",
   "workspaceFolder": "/home/workspace",
-  "extensions": [
-    "ms-python.python",
-    "eamodio.gitlens",
-    "esbenp.prettier-vscode"
-  ]
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "eamodio.gitlens",
+        "esbenp.prettier-vscode",
+        "ms-python.python"
+      ]
+    }
+  }
 }

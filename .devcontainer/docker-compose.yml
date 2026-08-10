@@ -1,8 +1,11 @@
 services:
   dev:
-    image: python:3.10
+    build: .
+    image: packagify
     # We do not want to recreate the container or have multiple instances of it running ever
     container_name: packagify
+    environment:
+      CLAUDE_CONFIG_DIR: /root/.claude
     volumes:
       # Mount SSH Keys as readonly
       - ~/.ssh:/root/.ssh-localhost:ro
@@ -10,9 +13,14 @@ services:
       - ~/.pypirc:/root/.pypirc:ro
       # Mount gitconfig
       - ~/.gitconfig:/root/.gitconfig:ro
+      # Persist claude credentials, settings and history across container rebuilds
+      - claude-config:/root/.claude
       # Mount working folder
       - ../:/home/workspace
     # The following commands ensure that the container stays active
     entrypoint: bash
     stdin_open: true
     tty: true
+
+volumes:
+  claude-config:
