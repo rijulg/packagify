@@ -4,6 +4,7 @@ import builtins
 import random
 import sys
 from textwrap import dedent
+from uuid import uuid4
 
 import pytest
 
@@ -16,12 +17,22 @@ class SampleProject:
     used to prove that any directory can be imported using this module
     """
 
-    __package_name: str
+    __written: int = 0
+
+    name: str
     location: str
     version: str
 
     def __init__(self):
-        self.version = f"{random.randint(0, 99)}.{random.randint(0, 99)}"
+        # A name of its own means the project is a package python has never
+        # seen, so nothing it imports can be served out of the module cache
+        # and no project has to be cleaned back out of it afterwards.
+        self.name = f"sample_project_{uuid4().hex}"
+        # The major is a running count so that no two projects can come out
+        # holding the same version; the minor is rolled so that nothing can
+        # quietly start passing against a hardcoded one.
+        SampleProject.__written += 1
+        self.version = f"{SampleProject.__written}.{random.randint(0, 99)}"
 
     def helper(self):
         return """
@@ -41,37 +52,38 @@ class SampleProject:
 
     def write(self, parent):
         """Write the folder into `parent` and return where it landed."""
-        self.__package_name = parent.name
-        self.location = str(parent)
+        location = parent / self.name
+        location.mkdir()
         for file in (self.helper, self.main):
-            (parent / f"{file.__name__}.py").write_text(dedent(file()).lstrip())
+            (location / f"{file.__name__}.py").write_text(dedent(file()).lstrip())
+        self.location = str(location)
         return self.location
-
-    def forget(self):
-        """Drop what a test imported out of the module cache.
-
-        The package name is the temp dir's, so pytest already keeps tests from
-        colliding; this is what stops the process from holding every project
-        any test ever imported.
-        """
-        for name in list(sys.modules):
-            if name == self.__package_name or name.startswith(
-                f"{self.__package_name}."
-            ):
-                del sys.modules[name]
 
 
 @pytest.fixture
-def sample_project(tmp_path):
-    """Write the folder under test to a temp dir and hand back the project.
+def sample_projects(tmp_path):
+    """Write a folder under test per call.
 
-    The project itself is yielded rather than just its location, so that a test
+    Each one lands in a folder of its own so that it is a package in its own
+    right, separate from anything else the test asked for.
+    """
+
+    def write():
+        project = SampleProject()
+        project.write(tmp_path)
+        return project
+
+    return write
+
+
+@pytest.fixture
+def sample_project(sample_projects):
+    """The one folder under test that most tests need.
+
+    The project is handed back rather than just its location, so that a test
     can assert against the version that was generated for it.
     """
-    project = SampleProject()
-    project.write(tmp_path)
-    yield project
-    project.forget()
+    return sample_projects()
 
 
 class TestImports:
@@ -121,14 +133,24 @@ class TestImportMachinery:
 
 
 class TestMultipleInstances:
-    """The same location can be loaded more than once in a single process."""
+    """More than one project can be loaded in a single process."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, sample_project):
-        self.project = sample_project
-        self.first = Packagify(sample_project.location)
-        self.second = Packagify(sample_project.location)
+    def setup(self, sample_projects):
+        self.first = sample_projects()
+        self.second = sample_projects()
 
-    def test_both_instances_import_the_same_module(self):
-        assert self.first.import_module("main", ["VERSION"]) == self.project.version
-        assert self.second.import_module("main", ["VERSION"]) == self.project.version
+    def test_the_projects_are_told_apart_by_their_version(self):
+        assert self.first.version != self.second.version
+
+    def test_each_instance_imports_its_own_project(self):
+        first = Packagify(self.first.location)
+        second = Packagify(self.second.location)
+        assert first.import_module("main", ["VERSION"]) == self.first.version
+        assert second.import_module("main", ["VERSION"]) == self.second.version
+
+    def test_one_project_can_be_loaded_twice(self):
+        once = Packagify(self.first.location)
+        again = Packagify(self.first.location)
+        assert once.import_module("main", ["VERSION"]) == self.first.version
+        assert again.import_module("main", ["VERSION"]) == self.first.version
