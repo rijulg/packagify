@@ -1,7 +1,6 @@
 services:
   dev:
-    build: .
-    image: packagify
+    image: python:3.10
     # We do not want to recreate the container or have multiple instances of it running ever
     container_name: packagify
     volumes:

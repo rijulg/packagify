@@ -12,7 +12,6 @@ setuptools.setup(
     author="Rijul Gupta",
     author_email="rijulg@gmail.com",
     url="https://github.com/rijulg/packagify",
-    download_url="https://github.com/rijulg/packagify/archive/v1.2.tar.gz",
     keywords=["Packaging", "Helper"],
     long_description=long_description,
     long_description_content_type="text/markdown",
