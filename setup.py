@@ -1,3 +1,4 @@
+import os
 import setuptools
 
 with open("README.md", "r") as readme:
@@ -6,7 +7,7 @@ with open("README.md", "r") as readme:
 setuptools.setup(
     name="packagify",
     packages=["packagify"],
-    version="1.2",
+    version=os.environ["RELEASE_VERSION"],
     license="MIT",
     description="A packaging utility to treat folders as packages",
     author="Rijul Gupta",
