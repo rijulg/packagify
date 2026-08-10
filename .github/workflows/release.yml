@@ -30,7 +30,9 @@ jobs:
           pip install pipenv
           pipenv install --ignore-pipfile
       - name: Lint files
-        run: pipenv run black packagify --check
+        run: pipenv run black packagify tests --check
+      - name: Run tests
+        run: pipenv run pytest
       - name: Build distribution
         run: pipenv run python -m build
         env:

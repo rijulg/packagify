@@ -20,3 +20,18 @@ object1, object2 = package.import_module("module", ["object1", "object2"])
     2. If a module adds a system path (using sys.path.append) we change the path to reflect the location of the module relative to the location from where we are loading the entire pacakage.
 
 2. After importing we revert back the functions to originals so that rest of the importing can work as is
+
+## Development
+
+Run the tests from the repository root:
+
+``` bash
+pipenv install
+pipenv run pytest
+```
+
+The suite is end to end: it loads [tests/fixtures/sample_project](tests/fixtures/sample_project), a folder that
+is deliberately not usable as a package, through `Packagify`.
+
+In VSCode the tests are discovered by the Python extension (see `.vscode/settings.json`); pick the
+interpreter that has `pytest` installed, then use the Testing panel or the `Test` task.
