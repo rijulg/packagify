@@ -30,8 +30,9 @@ pipenv install
 pipenv run pytest
 ```
 
-The suite is end to end: it loads [tests/fixtures/sample_project](tests/fixtures/sample_project), a folder that
-is deliberately not usable as a package, through `Packagify`.
+The suite is end to end: each test writes a small folder that is deliberately not usable as a
+package into a temp dir and loads it through `Packagify`. The folder's contents are defined at the
+top of [tests/test_e2e.py](tests/test_e2e.py).
 
 In VSCode the tests are discovered by the Python extension (see `.vscode/settings.json`); pick the
 interpreter that has `pytest` installed, then use the Testing panel or the `Test` task.
