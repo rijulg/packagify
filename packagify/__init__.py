@@ -31,7 +31,7 @@ class Packagify:
 
     def __init__(self, location):
         self.location = location
-        parts = location.rsplit('/', 1)
+        parts = location.rsplit("/", 1)
         sys.path.append(parts[0])
         self.__package = __import__(parts[1])
         sys.path.remove(parts[0])
@@ -47,7 +47,7 @@ class Packagify:
         if from_list:
             modules = ()
             for fl in from_list:
-                modules += (getattr(tmp, fl), )
+                modules += (getattr(tmp, fl),)
             if len(modules) > 1:
                 return modules
             else:
@@ -67,32 +67,34 @@ class Packagify:
         sys.path = self.original_syspath
 
     def __import__(self, name, globals=None, locals=None, fromlist=None, level=None):
-        params = {'level': 0}
+        params = {"level": 0}
         if globals is not None:
-            params['globals'] = globals
+            params["globals"] = globals
         if locals is not None:
-            params['locals'] = locals
+            params["locals"] = locals
         if fromlist is not None:
-            params['fromlist'] = fromlist
+            params["fromlist"] = fromlist
         if level is not None:
-            params['level'] = level
+            params["level"] = level
 
         try:
             module = self.original_import(name, **params)
         except ModuleNotFoundError:
             try:
                 # Try importing from root package
-                locals['__package__'] = self.__package.__name__
-                params['level'] += 1
+                locals["__package__"] = self.__package.__name__
+                params["level"] += 1
                 module = self.original_import(name, **params)
             except ModuleNotFoundError:
                 # Fix level change due to root import attempt
-                params['level'] -= 1
+                params["level"] -= 1
                 # Adapt for self import cases
                 if self.__is_trying_to_import_itself_from_parent(name, locals):
-                    locals['__package__'] = locals['__package__'].replace(f'.{name}', '')
+                    locals["__package__"] = locals["__package__"].replace(
+                        f".{name}", ""
+                    )
                 if self.__is_trying_to_import_without_specifying_parent(name, locals):
-                    params['level'] += 1
+                    params["level"] += 1
                 module = self.original_import(name, **params)
         return module
 
@@ -100,19 +102,18 @@ class Packagify:
         import_name_is_in_package = (
             name is not None
             and locals is not None
-            and '__package__' in locals
-            and name in locals['__package__']
+            and "__package__" in locals
+            and name in locals["__package__"]
         )
         my_package_name_is_in_import_file = (
-            '__file__' in locals
-            and self.__package.__name__ in locals['__file__']
+            "__file__" in locals and self.__package.__name__ in locals["__file__"]
         )
         return import_name_is_in_package and my_package_name_is_in_import_file
 
     def __is_trying_to_import_without_specifying_parent(self, name, locals):
         return (
             self.__package.__name__ not in name
-            and self.__package.__name__ in locals['__package__']
+            and self.__package.__name__ in locals["__package__"]
         )
 
     class SysPath(list):
@@ -121,7 +122,7 @@ class Packagify:
             self.location = location
 
         def append(self, item):
-            if item[0] == '/':
+            if item[0] == "/":
                 list.append(self, item)
             else:
                 list.append(self, f"{self.location}/{item}")
