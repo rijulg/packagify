@@ -48,6 +48,11 @@ class SampleProject:
 
             def hello():
                 return greet("world")
+
+            def hello_later():
+                from helper import greet
+
+                return greet("later")
         """
 
     def write(self, parent):
@@ -110,6 +115,12 @@ class TestImports:
     def test_imports_a_module_that_imports_its_sibling(self):
         greet = self.package.import_module("helper", ["greet"])
         assert greet("there") == "hello there"
+
+    def test_imports_a_sibling_once_the_module_is_already_loaded(self):
+        """A module of the project keeps its own import for as long as it lives,
+        so an import it only reaches when called still finds its siblings."""
+        hello_later = self.package.import_module("main", ["hello_later"])
+        assert hello_later() == "hello later"
 
 
 class TestImportMachinery:

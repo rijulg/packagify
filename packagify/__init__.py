@@ -1,5 +1,8 @@
 import builtins
+import os
 import sys
+from importlib.abc import MetaPathFinder
+from importlib.machinery import PathFinder
 
 
 class Packagify:
@@ -17,112 +20,125 @@ class Packagify:
 
 
     How this works:
-    1. This class overrides the import functionality of python while importing the module.
+    1. The project's directory goes on `sys.meta_path` as a finder for a package
+    of its own name, so that its modules are imported as `<directory>.<module>`
+    without the directory having to be importable from anywhere.
 
-        1.1. When the package tries to import certain modules from it's directory assuming
-        the script ran from there, we change the level of import from absolute to relative.
+    2. Those modules are run by a loader that hands them an `__import__` of their
+    own, so that the imports they write as though the interpreter ran from their
+    own directory (`import sibling`) are served out of the project, and everything
+    else is imported as usual.
 
-        1.2. If a module adds a system path (using sys.path.append) we change the path to reflect
-        the location of the module relative to the location from where we are loading the entire
-        pacakage.
+    3. While a module of the project runs, a relative path it appends to
+    `sys.path` is rewritten to sit under the project, since that is where it
+    means to point.
 
-    2. After importing we revert back the functions to originals so that rest of the importing can work as is
+    Nothing is installed into the interpreter at large: `builtins.__import__` is
+    never replaced, and the finder only ever answers for the project's own name.
     """
 
     def __init__(self, location):
+        self.project = _Project.install(location)
+        self.name = self.project.name
+        self.location = self.project.location
+
+    def import_module(self, module, from_list=()):
+        """Import a module of the project, or the objects named in from_list."""
+        imported = builtins.__import__(f"{self.name}.{module}", fromlist=from_list)
+        if not from_list:
+            return imported
+        objects = tuple(getattr(imported, name) for name in from_list)
+        return objects if len(objects) > 1 else objects[0]
+
+
+class _Project(MetaPathFinder):
+    """A project, as a finder of the modules it holds."""
+
+    @classmethod
+    def install(cls, location):
+        """The project at `location`, on `sys.meta_path` if it wasn't already."""
+        # an absolute location so that the project keeps being found from
+        # anywhere, whatever directory the process moves on to
+        location = os.path.abspath(location)
+        for finder in sys.meta_path:
+            if isinstance(finder, cls) and finder.location == location:
+                return finder
+        project = cls(location)
+        sys.meta_path.insert(0, project)
+        return project
+
+    def __init__(self, location):
         self.location = location
-        parts = location.rsplit("/", 1)
-        sys.path.append(parts[0])
-        self.__package = __import__(parts[1])
-        sys.path.remove(parts[0])
-        self.__save_originals()
+        self.name = os.path.basename(location)
+        if not os.path.isdir(location):
+            raise ModuleNotFoundError(f"No module named {self.name!r}", name=self.name)
+        self.builtins = dict(vars(builtins), __import__=self.__import)
 
-    def import_module(self, module, from_list=[]):
-        self.__hijack()
-        locs = locals()
-        locs[self.__package.__name__] = self.__package
-        name = f"{self.__package.__name__}.{module}"
-        tmp = __import__(name, locals=locs, fromlist=from_list)
-        self.__unhijack()
-        if from_list:
-            modules = ()
-            for fl in from_list:
-                modules += (getattr(tmp, fl),)
-            if len(modules) > 1:
-                return modules
-            else:
-                return modules[0]
-        return tmp
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == self.name:
+            # the project itself, found under its own directory's name
+            path = [os.path.dirname(self.location)]
+        elif fullname.startswith(f"{self.name}."):
+            # a module of the project, searched for where the project keeps it
+            path = list(path or [self.location])
+        else:
+            return None
+        spec = PathFinder.find_spec(fullname, path, target)
+        if spec is not None and hasattr(spec.loader, "exec_module"):
+            spec.loader = _Loader(spec.loader, self)
+        return spec
 
-    def __save_originals(self):
-        self.original_import = builtins.__import__
-        self.original_syspath = sys.path
+    def provides(self, name):
+        """Whether the module `name` asks for is one of the project's own."""
+        return self.find_spec(f"{self.name}.{name.partition('.')[0]}") is not None
 
-    def __hijack(self):
-        builtins.__import__ = self.__import__
-        sys.path = self.SysPath(sys.path, self.location)
+    def __import(self, name, globals=None, locals=None, fromlist=(), level=0):
+        """The `__import__` the project's own modules are run with."""
+        if level or not self.provides(name):
+            return builtins.__import__(name, globals, locals, fromlist, level)
+        module = builtins.__import__(
+            f"{self.name}.{name}", globals, locals, fromlist, 0
+        )
+        if fromlist:
+            return module
+        # `import a.b` binds `a`, the same as it does anywhere else
+        return sys.modules[f"{self.name}.{name.partition('.')[0]}"]
 
-    def __unhijack(self):
-        builtins.__import__ = self.original_import
-        sys.path = self.original_syspath
 
-    def __import__(self, name, globals=None, locals=None, fromlist=None, level=None):
-        params = {"level": 0}
-        if globals is not None:
-            params["globals"] = globals
-        if locals is not None:
-            params["locals"] = locals
-        if fromlist is not None:
-            params["fromlist"] = fromlist
-        if level is not None:
-            params["level"] = level
+class _Loader:
+    """Runs a module of the project the way the module expects to be run.
 
+    Everything but running the module is left to the loader the module would
+    have been given otherwise.
+    """
+
+    def __init__(self, loader, project):
+        self.loader = loader
+        self.project = project
+
+    def __getattr__(self, attribute):
+        return getattr(self.loader, attribute)
+
+    def exec_module(self, module):
+        # a module carries its own builtins, so the project's import is the one
+        # its code sees for as long as it lives, imports made after loading too
+        module.__dict__["__builtins__"] = self.project.builtins
+        path = sys.path
+        sys.path = _SysPath(path, self.project.location)
         try:
-            module = self.original_import(name, **params)
-        except ModuleNotFoundError:
-            try:
-                # Try importing from root package
-                locals["__package__"] = self.__package.__name__
-                params["level"] += 1
-                module = self.original_import(name, **params)
-            except ModuleNotFoundError:
-                # Fix level change due to root import attempt
-                params["level"] -= 1
-                # Adapt for self import cases
-                if self.__is_trying_to_import_itself_from_parent(name, locals):
-                    locals["__package__"] = locals["__package__"].replace(
-                        f".{name}", ""
-                    )
-                if self.__is_trying_to_import_without_specifying_parent(name, locals):
-                    params["level"] += 1
-                module = self.original_import(name, **params)
-        return module
+            self.loader.exec_module(module)
+        finally:
+            sys.path = path
 
-    def __is_trying_to_import_itself_from_parent(self, name, locals):
-        import_name_is_in_package = (
-            name is not None
-            and locals is not None
-            and "__package__" in locals
-            and name in locals["__package__"]
-        )
-        my_package_name_is_in_import_file = (
-            "__file__" in locals and self.__package.__name__ in locals["__file__"]
-        )
-        return import_name_is_in_package and my_package_name_is_in_import_file
 
-    def __is_trying_to_import_without_specifying_parent(self, name, locals):
-        return (
-            self.__package.__name__ not in name
-            and self.__package.__name__ in locals["__package__"]
-        )
+class _SysPath(list):
+    """A `sys.path` that reads an appended relative path as the project's."""
 
-    class SysPath(list):
-        def __init__(self, args, location):
-            list.__init__(self, args)
-            self.location = location
+    def __init__(self, entries, location):
+        super().__init__(entries)
+        self.location = location
 
-        def append(self, item):
-            if item[0] == "/":
-                list.append(self, item)
-            else:
-                list.append(self, f"{self.location}/{item}")
+    def append(self, entry):
+        if not os.path.isabs(entry):
+            entry = os.path.join(self.location, entry)
+        super().append(entry)
