@@ -1,12 +1,10 @@
-"""The behaviours of a declared project that an example cannot show.
+"""Declared-project behaviours an example cannot show.
 
-What using a declaration looks like is in [examples/declared_project], which is
-a repository that really works and is really run by `test_examples.py`. What is
-left here is what an example is the wrong shape for: the ways a declaration
-fails, and the promise that everything else imports exactly as it did before.
-
-The one thing here that an example does cover is the plain success case, kept
-because an example runs in a process of its own and so measures nothing.
+What a declaration looks like in use is [examples/declared_project], run by
+`test_examples.py`. Left here is what an example is the wrong shape for: the
+ways a declaration fails, and the promise that every other import is untouched.
+The success case is repeated because an example runs in its own process and so
+asserts nothing about this one.
 """
 
 import sys
@@ -17,8 +15,8 @@ from uuid import uuid4
 import pytest
 
 # a folder of the kind this package is for: its modules import each other as
-# though the interpreter were run from inside it, which no path on `sys.path`
-# and no name in a declaration can fix on their own
+# though the interpreter ran from inside it, which no `sys.path` entry and no
+# name in a declaration fixes on its own
 NOT_A_PACKAGE = {
     "helper.py": """
         def greet(who):
@@ -40,8 +38,8 @@ DECLARES_MY_APP = """
 
 @pytest.fixture(autouse=True)
 def leave_the_declared_names_free():
-    """A declared project is cached under its name like any other module, so
-    each test hands back the names it claimed for the next one to use."""
+    """Declared projects are cached like any other module, so each test hands
+    back the names it claimed."""
     finders = list(sys.meta_path)
     modules = set(sys.modules)
     yield
@@ -100,10 +98,9 @@ class TestDeclaredProjects:
         assert app.GREETING == "hello world"
 
     def test_looks_past_a_nearer_pyproject_that_declares_nothing(self, repository, run):
-        """A repository that publishes packages of its own holds a
-        `pyproject.toml` per package, and only one of them declares the folders
-        the repository imports. A nearer file that declares nothing is passed
-        over rather than taken as an empty declaration."""
+        """A repository publishing packages of its own holds a `pyproject.toml`
+        per package, only one of which declares folders. A nearer file that
+        declares nothing is skipped, not read as an empty declaration."""
         written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
         published = written / "packages" / "thing"
         published.mkdir(parents=True)
@@ -118,9 +115,8 @@ class TestDeclaredProjects:
         assert app.GREETING == "hello world"
 
     def test_answers_a_name_the_machinery_looks_up_for_a_file(self, repository, run):
-        """A file that asks whether the project is there, rather than importing
-        it, asks through importlib - which puts importlib's own frames between
-        the question and the answer without making importlib the one asking."""
+        """Asking whether the project exists goes through importlib, putting its
+        frames between question and answer without making it the caller."""
         written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
 
         app = run(written, "app.py", """
@@ -132,8 +128,8 @@ class TestDeclaredProjects:
         assert app.FOUND is True
 
     def test_leaves_every_other_import_alone(self, repository, run):
-        """The finder is the last one asked, so a name anything else can answer
-        for never reaches it, and a name nothing can still fails as usual."""
+        """The finder is asked last, so a name anything else answers for never
+        reaches it, and a name nothing answers for still fails as usual."""
         written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
 
         app = run(written, "app.py", """
@@ -161,8 +157,8 @@ class TestDeclarationsThatDoNotHold:
             run(written, "app.py", "from packagify.other_app.main import hello\n")
 
     def test_refuses_a_declaration_that_points_nowhere(self, repository, run):
-        """A location that was mistyped is one the declaration is answerable
-        for, so it is named in what comes back rather than the import."""
+        """A mistyped location is the declaration's fault, so the error names it
+        rather than the import."""
         written = repository(
             """
             [tool.packagify]
@@ -181,7 +177,6 @@ class TestDeclarationsThatDoNotHold:
             run(written, "app.py", "from packagify.my_app.main import hello\n")
 
     def test_refuses_a_file_with_no_declaration_above_it_at_all(self, tmp_path, run):
-        """Nothing above the file says anything about packagify, so there is
-        nothing the name could have meant."""
+        """Nothing above the file mentions packagify, so the name means nothing."""
         with pytest.raises(ModuleNotFoundError, match="packagify.my_app"):
             run(tmp_path, "app.py", "from packagify.my_app.main import hello\n")

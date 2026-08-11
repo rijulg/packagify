@@ -7,8 +7,8 @@ from .SysPath import SysPath
 class Loader(importlib.abc.Loader):
     """Runs a module of the project the way the module expects to be run.
 
-    Everything but running the module is left to the loader the module would
-    have been given otherwise.
+    Everything but running the module is delegated to the loader it would
+    otherwise have had.
     """
 
     def __init__(self,
@@ -24,8 +24,7 @@ class Loader(importlib.abc.Loader):
         return getattr(self.__loader, attribute)
 
     def exec_module(self, module):
-        # override sys.path and module.__builtins__ and load the module
-        # then return sys.path to original
+        # swap in the project's sys.path and __import__ for the run, then restore
         path = sys.path
         try:
             sys.path = self.__new_path

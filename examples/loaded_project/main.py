@@ -1,8 +1,7 @@
 """Loads a folder that has no repository of its own to declare it.
 
-Not every folder worth importing sits inside a project you control: it may be
-somewhere else on the machine entirely. Naming it in a call works wherever a
-declaration cannot reach, and the name is yours to pick.
+Not every folder worth importing sits inside a project you control. Naming it in
+a call reaches wherever a declaration cannot.
 """
 
 import os

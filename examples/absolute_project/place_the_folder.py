@@ -1,9 +1,8 @@
 """Puts the folder where this repository's declaration says it lives.
 
 Stands in for whatever really puts a folder outside a repository: a shared
-mount, an unzipped vendor drop, a checkout someone made beside this one. The
-declaration is read rather than repeated, so there is one place saying where
-the folder goes and the example cannot drift from it.
+mount, an unzipped vendor drop, a checkout beside this one. The declaration is
+read rather than repeated, so the example cannot drift from it.
 """
 
 import os

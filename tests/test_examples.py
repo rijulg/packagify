@@ -1,7 +1,6 @@
-"""The examples are run the way their README says to run them.
+"""Runs the examples the way their README says to, and checks what they print.
 
-An example that is not run is an example that stops being true, so each one is
-executed as its own program here and checked against what it prints.
+An example nothing runs is one that quietly stops being true.
 """
 
 import os
@@ -17,7 +16,7 @@ EXAMPLES = ROOT / "examples"
 
 @pytest.fixture
 def example():
-    """Run an example the way the README says to, and hand back what it said."""
+    """Run an example as the README says to, and hand back its output."""
 
     def run(script):
         finished = subprocess.run(
@@ -56,10 +55,9 @@ def test_the_loaded_example_runs(example):
 
 
 def test_the_absolute_example_runs(example):
-    """A folder outside the repository, declared by the path it really has.
+    """A folder outside the repository, declared by its absolute path.
 
-    The folder is put where the declaration says before anything imports it,
-    the way whatever really puts it there would have."""
+    It is placed where the declaration says before anything imports it."""
     placed = example("absolute_project/place_the_folder.py")
     assert placed.startswith("placed shared at ")
 

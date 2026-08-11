@@ -13,13 +13,10 @@ class Project(importlib.abc.MetaPathFinder):
 
     @classmethod
     def install(cls, name: str, location: str):
-        """
-        Idempotent installer
-        if `Project` already exists in `sys.meta_path` then return that.
-        Otherwise, create an instance of the `Project` and add it to `sys.meta_path`.
+        """Install a finder for `name`, or return the one already installed.
 
-        The name is dotted for a project that is declared rather than loaded by
-        hand, since those are held as modules of this package.
+        The name is dotted for a declared project, since those are held as
+        modules of this package.
         """
         for finder in sys.meta_path:
             if isinstance(finder, cls) and finder.__name == name:
@@ -42,8 +39,8 @@ class Project(importlib.abc.MetaPathFinder):
 
     def find_spec(self, fullname, path=None, target=None):
         if fullname == self.__name:
-            # the project itself, which is the directory under the project's
-            # name rather than under the one the directory happens to have
+            # the project itself: the directory, under the given name rather
+            # than the one it happens to have
             spec = self.__spec_of_the_project(fullname)
         elif fullname.startswith(f"{self.__name}."):
             # a module of the project, searched for where the project keeps it
@@ -59,18 +56,18 @@ class Project(importlib.abc.MetaPathFinder):
         return spec
 
     def __spec_of_the_project(self, fullname):
-        """The project's own directory, as the package the project is imported as.
+        """The project's directory, as the package it is imported as.
 
-        The spec is built rather than searched for, since the directory is not
-        named after the project and need not be importable as a package at all.
+        Built rather than searched for, since the directory is not named after
+        the project and need not be importable as a package at all.
         """
         init = os.path.join(self.__location, "__init__.py")
         if os.path.isfile(init):
-            # a directory that is a package of its own is loaded as one
+            # a directory that is already a package is loaded as one
             return importlib.util.spec_from_file_location(
                 fullname, init, submodule_search_locations=[self.__location]
             )
-        # a directory that is not holds its modules and nothing else to run
+        # otherwise there is nothing to run, only modules to search
         spec = ModuleSpec(fullname, None, is_package=True)
         spec.submodule_search_locations = [self.__location]
         return spec

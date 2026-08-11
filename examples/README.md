@@ -1,8 +1,8 @@
 # Examples
 
-Three working folders, one per way of naming a project. Run them from the repository root:
+Three working projects, one per way of naming a folder. Run them from the repository root:
 
-``` bash
+```bash
 PYTHONPATH=. python "examples/declared_project/src/main.py"
 PYTHONPATH=. python examples/loaded_project/main.py
 
@@ -10,73 +10,52 @@ python examples/absolute_project/place_the_folder.py
 PYTHONPATH=. python examples/absolute_project/src/main.py
 ```
 
-`PYTHONPATH=.` is only needed because packagify is not installed into this repository's own
-environment. A consumer who has run `pip install packagify` runs the same files with plain
-`python`.
+`PYTHONPATH=.` is only needed because packagify isn't installed into this repository's environment; after `pip install packagify`, plain `python` works.
 
-Both examples are run by [tests/test_examples.py](../tests/test_examples.py), so they cannot
-quietly stop working.
+All three are run by [tests/test_examples.py](../tests/test_examples.py), so they can't quietly stop working.
 
 ## declared_project
 
-A repository that declares the two folders it wants to import, which is all the setup there is:
+A repository that declares the two folders it imports, which is all the setup there is:
 
-``` toml
+```toml
 [tool.packagify]
 reports = "vendor/legacy report tool v2"
 totals = "vendor/totals (unreleased)"
 ```
 
-``` python
+```python
 from packagify.reports.api import report
 from packagify.totals.summing import total
 ```
 
-Nothing is installed and nothing is called. The declaration travels with the code, so the
-repository works from a fresh clone, and the locations in it are read relative to the
-`pyproject.toml` that holds them rather than to wherever python was started. The file doing the
-importing is `src/main.py`, a directory below the declaration, since the declaration is found by
-looking up from whichever file writes the import.
+Locations are resolved against the `pyproject.toml` holding them, not the working directory, so the repository works from a fresh clone. The importing file is `src/main.py`, a directory below the declaration, since the declaration is found by looking upwards.
 
-Neither folder could be written as an import — `legacy report tool v2` and `totals (unreleased)`
-— and the first one's modules import each other (`from renderer import render`) the way a script
-run from inside the folder would. That last part is the half no amount of installing or path
-juggling can fix, and it is the reason packagify exists.
+Neither folder could be written as an import — `legacy report tool v2` and `totals (unreleased)` — and the first one's modules import each other (`from renderer import render`) the way a script run from inside the folder would. That last part is what no amount of installing or path juggling fixes, and it's why packagify exists.
 
 ## absolute_project
 
-The same declaration, holding a location that is absolute:
+The same declaration with an absolute location:
 
-``` toml
+```toml
 [tool.packagify]
 shared = "/tmp/packagify-example-shared-toolkit"
 ```
 
-A location under the declaring file is read as one under it; a location that is absolute is taken
-as it is written. So a folder that lives nowhere near the repository — a shared mount, an unzipped
-vendor drop, a checkout sitting beside this one — is declared the same way as one inside it, and
-`src/main.py` writes the same import either way.
+A folder that lives nowhere near the repository — a shared mount, an unzipped vendor drop, a checkout beside this one — is declared the same way as one inside it, and `src/main.py` writes the same import either way.
 
-That path is the whole reason to prefer a relative location whenever there is one: it is true of
-one machine rather than of the code, so it cannot be committed and expected to hold for anyone
-else. This example works around that the only way an example can, by putting the folder there
-first — `place_the_folder.py` reads the declaration and creates what it names, standing in for
-whatever really puts a folder outside a repository. The path is under `/tmp` so that the example
-runs on any posix machine; on Windows it would need one of that machine's own.
+Prefer a relative location when there is one: an absolute path is true of one machine rather than of the code, so committing it won't hold for anyone else. This example works around that by putting the folder there first — `place_the_folder.py` reads the declaration and creates what it names, standing in for whatever really puts a folder outside a repository. `/tmp` keeps it runnable on any posix machine; Windows would need a path of its own.
 
 ## loaded_project
 
 A folder with no repository of its own to declare it, named in a call instead:
 
-``` python
+```python
 packagify("/somewhere/acme toolkit 1.2", "acme")
 
 from acme.scales import weigh
 ```
 
-This reaches folders a declaration cannot: another checkout, a shared drive, a path worked out
-while the program runs. The import has to be written after the call, since the name does not
-exist until the call is made.
+This reaches folders a declaration can't: another checkout, a shared drive, a path computed at runtime. The import comes after the call, since the name doesn't exist until then.
 
-The name is a top level one, so it is what the whole process imports under that name from then
-on — pick one nothing else answers for.
+The name is top-level, so it's what the whole process imports under that name from then on — pick one nothing else answers for.

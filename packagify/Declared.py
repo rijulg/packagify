@@ -11,19 +11,18 @@ from .Project import Project
 class Declared(importlib.abc.MetaPathFinder):
     """The projects a declaration holds, as modules of this package.
 
-    A project the nearest declaring `pyproject.toml` above the importing file
-    holds is imported as `packagify.<name>`, with nothing to install and nothing
-    to call. The finder goes on the end of `sys.meta_path` rather than the front,
-    so it only ever answers for a name that nothing else could.
+    A project named by the nearest declaring `pyproject.toml` above the importing
+    file is imported as `packagify.<name>`, with nothing to install and nothing to
+    call. This finder goes on the end of `sys.meta_path`, so it only answers for
+    names nothing else could.
     """
     DECLARATION = "pyproject.toml"
     PACKAGE = __package__
     PREFIX = f"{PACKAGE}."
-    # the files the import system runs while it answers an import statement,
-    # which are never the file that wrote one. Held as files rather than as
-    # module names so that every part of the machinery is covered, including the
-    # ones a later python grows, and every module of this package rather than
-    # this one alone, since a project's own import is answered through them.
+    # files the import system runs while answering an import, which are never the
+    # file that wrote one. Matched by directory rather than module name so future
+    # python versions stay covered, and the whole of this package rather than just
+    # this module, since a project's own imports are answered through it.
     __MACHINERY = (
         os.path.dirname(importlib.__file__) + os.sep,
         os.path.dirname(os.path.abspath(__file__)) + os.sep,
@@ -44,9 +43,9 @@ class Declared(importlib.abc.MetaPathFinder):
     def __declarations(self, directory):
         """The projects the nearest declaration above `directory` holds.
 
-        A `pyproject.toml` that declares nothing is not the declaration, since a
-        repository holds one per package it publishes and only one of them is
-        answering for the folders the repository imports.
+        A `pyproject.toml` without a `[tool.packagify]` table is skipped: a
+        repository holds one per package it publishes, and only one of them
+        declares the folders the repository imports.
         """
         for parent in (Path(directory), *Path(directory).parents):
             declared = self.__declared_at(parent)
@@ -57,15 +56,11 @@ class Declared(importlib.abc.MetaPathFinder):
     @staticmethod
     @functools.lru_cache(maxsize=None)
     def __declared_at(directory):
-        """The projects the declaration in `directory` holds, or None if it holds
-        no declaration at all.
+        """The projects declared in `directory`, or None if it declares nothing.
 
-        The locations are read as the declaring file means them, which is relative
-        to the directory holding it rather than to wherever python was started.
-
-        Read once per directory, the same as any other tool reads its
-        configuration, so that an import costs nothing to answer twice. The
-        result is shared between callers and so is never modified.
+        Locations are resolved against the declaring file rather than the working
+        directory. Read once per directory, so answering an import twice costs
+        nothing; the cached result is shared, so it is never modified.
         """
         declaration = directory / Declared.DECLARATION
         if not declaration.is_file():

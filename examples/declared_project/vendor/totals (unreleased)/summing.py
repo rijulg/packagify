@@ -1,7 +1,6 @@
 """Adds up the rows the report tool renders.
 
-A second folder, vendored separately and never released, so the repository has
-two of them to declare.
+A second folder, vendored separately, so the repository has two to declare.
 """
 
 

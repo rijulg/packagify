@@ -1,7 +1,7 @@
 import os
 
 class SysPath(list):
-    """A `sys.path` that reads an appended relative path as the project's."""
+    """A `sys.path` that resolves an appended relative path against the project."""
 
     def __init__(self, entries, location):
         super().__init__(entries)
