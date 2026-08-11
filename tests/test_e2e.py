@@ -239,6 +239,33 @@ class TestImports:
         assert version == self.project.version
 
 
+class TestPlainImports:
+    """A loaded project is reached by ordinary import statements too.
+
+    `import_module` is a convenience over `__import__`, so a project loaded
+    under a name that is written where it is imported is reached the way any
+    other package is. Each test writes a name of its own, since a name is only
+    ever loaded once in a process: whoever asked for it after that would be
+    served the module cached for the project that took it first. That is what
+    the generated names the rest of the suite loads under are for.
+    """
+
+    def test_imports_a_module_of_the_project(self, sample_project):
+        Packagify(sample_project.location, "imported_by_statement")
+
+        import imported_by_statement.main
+
+        assert imported_by_statement.main.VERSION == sample_project.version
+
+    def test_imports_an_object_of_a_module_of_the_project(self, sample_project):
+        Packagify(sample_project.location, "imported_from_statement")
+
+        from imported_from_statement.main import VERSION, hello
+
+        assert hello() == "hello world"
+        assert VERSION == sample_project.version
+
+
 class TestNames:
     """The name a project is imported under is its own, not its directory's."""
 
