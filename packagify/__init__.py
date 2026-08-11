@@ -1,6 +1,7 @@
 import builtins
 import os
 import sys
+from uuid import uuid4
 from importlib.abc import MetaPathFinder
 from importlib.machinery import PathFinder
 
@@ -38,24 +39,31 @@ class Packagify:
     """
 
     def __init__(self, location):
-        self.project = _Project.install(location)
-        self.name = self.project.name
+        name = os.path.basename(location)
+        self.project = _Project.install(location=location, name=name)
+        self.name = name
         self.location = self.project.location
 
     def import_module(self, module, from_list=()):
         """Import a module of the project, or the objects named in from_list."""
         imported = builtins.__import__(f"{self.name}.{module}", fromlist=from_list)
         if not from_list:
+            # equivalent to: `import X`
             return imported
         objects = tuple(getattr(imported, name) for name in from_list)
-        return objects if len(objects) > 1 else objects[0]
+        if len(objects) > 1:
+            # equivalent to: `from X import Y1, Y2`
+            return objects
+        else:
+            # equivalent to: `from X import Y`
+            return objects[0]
 
 
 class _Project(MetaPathFinder):
     """A project, as a finder of the modules it holds."""
 
     @classmethod
-    def install(cls, location):
+    def install(cls, location, name):
         """The project at `location`, on `sys.meta_path` if it wasn't already."""
         # an absolute location so that the project keeps being found from
         # anywhere, whatever directory the process moves on to
@@ -63,13 +71,13 @@ class _Project(MetaPathFinder):
         for finder in sys.meta_path:
             if isinstance(finder, cls) and finder.location == location:
                 return finder
-        project = cls(location)
+        project = cls(location=location, name=name)
         sys.meta_path.insert(0, project)
         return project
 
-    def __init__(self, location):
+    def __init__(self, location, name):
         self.location = location
-        self.name = os.path.basename(location)
+        self.name = name
         if not os.path.isdir(location):
             raise ModuleNotFoundError(f"No module named {self.name!r}", name=self.name)
         self.builtins = dict(vars(builtins), __import__=self.__import)
