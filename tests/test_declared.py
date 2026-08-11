@@ -99,6 +99,38 @@ class TestDeclaredProjects:
 
         assert app.GREETING == "hello world"
 
+    def test_looks_past_a_nearer_pyproject_that_declares_nothing(self, repository, run):
+        """A repository that publishes packages of its own holds a
+        `pyproject.toml` per package, and only one of them declares the folders
+        the repository imports. A nearer file that declares nothing is passed
+        over rather than taken as an empty declaration."""
+        written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
+        published = written / "packages" / "thing"
+        published.mkdir(parents=True)
+        (published / "pyproject.toml").write_text("[project]\nname = 'thing'\n")
+
+        app = run(written, "packages/thing/app.py", """
+            from packagify.my_app.main import hello
+
+            GREETING = hello()
+        """)
+
+        assert app.GREETING == "hello world"
+
+    def test_answers_a_name_the_machinery_looks_up_for_a_file(self, repository, run):
+        """A file that asks whether the project is there, rather than importing
+        it, asks through importlib - which puts importlib's own frames between
+        the question and the answer without making importlib the one asking."""
+        written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
+
+        app = run(written, "app.py", """
+            import importlib.util
+
+            FOUND = importlib.util.find_spec("packagify.my_app") is not None
+        """)
+
+        assert app.FOUND is True
+
     def test_leaves_every_other_import_alone(self, repository, run):
         """The finder is the last one asked, so a name anything else can answer
         for never reaches it, and a name nothing can still fails as usual."""

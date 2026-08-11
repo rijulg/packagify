@@ -48,8 +48,11 @@ reports = "vendor/legacy report tool v2"
 from packagify.reports.api import report
 ```
 
-The declaration is the nearest `pyproject.toml` above the file writing the import, and the
-locations in it are read relative to that file, so the repository works from a fresh clone.
+The declaration is the nearest `pyproject.toml` above the file writing the import that holds a
+`[tool.packagify]` table, and the locations in it are read relative to that file, so the
+repository works from a fresh clone. A nearer `pyproject.toml` that declares nothing is passed
+over rather than taken as an empty declaration, so a repository that publishes packages of its
+own keeps importing the folders it declares at the top.
 
 ## Examples
 
