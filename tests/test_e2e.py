@@ -70,6 +70,16 @@ class SampleProject:
                 "content": f"""
                     from .submodule import VERSION
                 """
+            },
+            {
+                "path": "uses_submodule_syspath.py",
+                "content": f"""
+                    import sys
+
+                    sys.path.append("submodule")
+
+                    from submodule import VERSION
+                """
             }
         ]
 
@@ -143,10 +153,14 @@ class TestImports:
         hello_later = self.package.import_module("main", ["hello_later"])
         assert hello_later() == "hello later"
 
-    def test_imports_through_a_relative_path_the_module_appends(self):
+    def test_imports_through_a_relative_path(self):
         """A relative path a module puts on `sys.path` is meant as its own
         project's, not as one of wherever the interpreter was started."""
         version = self.package.import_module("uses_submodule", ["VERSION"])
+        assert version == self.project.version
+
+    def test_imports_through_a_relative_path_the_module_appends(self):
+        version = self.package.import_module("uses_submodule_syspath", ["VERSION"])
         assert version == self.project.version
 
 
