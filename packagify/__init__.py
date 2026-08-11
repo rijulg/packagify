@@ -1,9 +1,15 @@
 import builtins
 import os
 import sys
+import tomllib
 import importlib.abc
 import importlib.util
 from importlib.machinery import ModuleSpec, PathFinder
+
+DECLARATION = "pyproject.toml"
+
+# the frames between a module's import statement and the finder answering it
+_MACHINERY = ("importlib._bootstrap", "importlib._bootstrap_external", "importlib", __name__)
 
 
 def packagify(location, name):
@@ -50,7 +56,65 @@ def packagify(location, name):
     Nothing is installed into the interpreter at large: `builtins.__import__` is
     never replaced, and the finder only ever answers for the project's own name.
     """
+    if "." in name:
+        raise ValueError(f"Invalid name: {name}, a project is a package of its own")
     _Project.install(location=location, name=name)
+
+
+def _calling_directory():
+    """The directory of the file whose import statement is being answered."""
+    frame = sys._getframe(1)
+    while frame is not None:
+        if frame.f_globals.get("__name__") not in _MACHINERY and "__file__" in frame.f_globals:
+            return os.path.dirname(os.path.abspath(frame.f_globals["__file__"]))
+        frame = frame.f_back
+    # a caller with no file of its own, such as a REPL, means where it is run from
+    return os.getcwd()  # pragma: no cover
+
+
+def _declarations(directory):
+    """The projects the nearest declaration above `directory` holds.
+
+    The locations are read as the declaring file means them, which is relative
+    to the directory holding it rather than to wherever python was started.
+    """
+    while True:
+        declaration = os.path.join(directory, DECLARATION)
+        if os.path.isfile(declaration):
+            with open(declaration, "rb") as file:
+                declared = tomllib.load(file).get("tool", {}).get(__name__, {})
+            return {
+                name: os.path.join(directory, location)
+                for name, location in declared.items()
+            }
+        parent = os.path.dirname(directory)
+        if parent == directory:
+            return {}
+        directory = parent
+
+
+class _Declared(importlib.abc.MetaPathFinder):
+    """The projects a declaration holds, as modules of this package.
+
+    A project the nearest `pyproject.toml` above the importing file declares is
+    imported as `packagify.<name>`, with nothing to install and nothing to call.
+    The finder goes on the end of `sys.meta_path` rather than the front, so it
+    only ever answers for a name that nothing else could.
+    """
+
+    PREFIX = f"{__name__}."
+
+    def find_spec(self, fullname, path=None, target=None):
+        if not fullname.startswith(self.PREFIX):
+            return None
+        directory = _calling_directory()
+        location = _declarations(directory).get(fullname[len(self.PREFIX):])
+        if location is None:
+            # a name nothing declares, or a module of a project that is already
+            # answered for by the finder installed for the project itself
+            return None
+        project = _Project.install(location=location, name=fullname)
+        return project.find_spec(fullname, path, target)
 
 
 class _Project(importlib.abc.MetaPathFinder):
@@ -62,9 +126,10 @@ class _Project(importlib.abc.MetaPathFinder):
         Idempotent installer
         if `Project` already exists in `sys.meta_path` then return that.
         Otherwise, create an instance of the `Project` and add it to `sys.meta_path`.
+
+        The name is dotted for a project that is declared rather than loaded by
+        hand, since those are held as modules of this package.
         """
-        if "." in name:
-            raise ValueError(f"Invalid name: {name}, a project is a package of its own")
         for finder in sys.meta_path:
             if isinstance(finder, cls) and finder.__name == name:
                 if finder.__location != location:
@@ -177,3 +242,8 @@ class _Loader(importlib.abc.Loader):
             self.__loader.exec_module(module)
         finally:
             sys.path = path
+
+
+# last, so that a declared project is only ever reached by a name that is not
+# already something else the interpreter can import
+sys.meta_path.append(_Declared())

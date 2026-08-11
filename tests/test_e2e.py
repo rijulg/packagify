@@ -350,21 +350,24 @@ class TestImportMachinery:
     def test_restores_the_import_function(self):
         packagify(self.project.location, "restores_the_import")
 
-        import restores_the_import.main
+        # the import is the thing that does the hijacking
+        import restores_the_import.main  # noqa: F401
 
         assert builtins.__import__ is self.original_import
 
     def test_restores_the_sys_path(self):
         packagify(self.project.location, "restores_the_path")
 
-        import restores_the_path.main
+        # the import is the thing that does the hijacking
+        import restores_the_path.main  # noqa: F401
 
         assert sys.path == self.original_syspath
 
     def test_restores_the_sys_path_type(self):
         packagify(self.project.location, "restores_the_path_type")
 
-        import restores_the_path_type.main
+        # the import is the thing that does the hijacking
+        import restores_the_path_type.main  # noqa: F401
 
         assert type(sys.path) is list
 

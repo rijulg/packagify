@@ -36,6 +36,30 @@ It is the name the project holds for as long as it is loaded, so no two projects
 be given the same one. It is a top level name like any other, so a folder loaded as `json` is what
 the rest of the process imports under that name: pick one nothing else answers for.
 
+A folder that sits inside a repository can be declared instead of loaded, in which case there is
+nothing to install and nothing to call:
+
+``` toml
+[tool.packagify]
+reports = "vendor/legacy report tool v2"
+```
+
+``` python
+from packagify.reports.api import report
+```
+
+The declaration is the nearest `pyproject.toml` above the file writing the import, and the
+locations in it are read relative to that file, so the repository works from a fresh clone.
+
+## Examples
+
+Two working folders, one per way of using packagify, in [examples/](examples/):
+
+``` bash
+PYTHONPATH=. python "examples/declared_project/src/main.py"
+PYTHONPATH=. python examples/loaded_project/main.py
+```
+
 ## How this works
 
 1. The folder is registered as a [finder](https://docs.python.org/3/reference/import.html#finders-and-loaders) on `sys.meta_path`, under a package of the project's name, so its modules are imported as `<name>.<module>` without the folder having to be importable from anywhere, or even having to be named like a package. The package the name stands for is built from the folder rather than searched for, so the folder is reached under the project's name whatever it is called; a folder that holds an `__init__.py` still has it run.

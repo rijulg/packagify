@@ -1,0 +1,11 @@
+[project]
+name = "declared-example"
+version = "0.1.0"
+dependencies = ["packagify"]
+
+# The whole of the setup. Every folder named here is importable as
+# `packagify.<name>` from anywhere in this repository, with nothing to install
+# and nothing to call. Locations are read relative to this file.
+[tool.packagify]
+reports = "vendor/legacy report tool v2"
+totals = "vendor/totals (unreleased)"
