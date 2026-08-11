@@ -6,18 +6,25 @@ import importlib.util
 from importlib.machinery import ModuleSpec, PathFinder
 
 
-class Packagify:
+def packagify(location, name):
     """
     Used to load python projects that aren't suitable to be used as packages
     You can use this class as following:
 
     ```
-    from packagify import Packagify
-    package = Packagify("/home/workspace/my_package", "my_package")
-    object = package.import_module("module", ["object"])
-    object1, object2 = package.import_module("module", ["object1", "object2"])
+    from packagify import packagify
+    packagify("/home/workspace/my_package", "my_package")
+
+    import my_package.module
+    from my_package.module import object
+    from my_package.module import object1, object2
     ```
     This will allow you to import modules and objects from my_package as and where it exists.
+
+    Loading the project is all there is to it: from then on its modules are
+    reached by the import statements any other package's are. A name that is
+    only known while the program runs has nothing to write those statements
+    with, so it is imported with `importlib.import_module(f"{name}.module")`.
 
 
     The name the project is imported under is given, and has nothing to do with
@@ -43,24 +50,7 @@ class Packagify:
     Nothing is installed into the interpreter at large: `builtins.__import__` is
     never replaced, and the finder only ever answers for the project's own name.
     """
-
-    def __init__(self, location, name):
-        self.name = name
-        _Project.install(location=location, name=name)
-
-    def import_module(self, module, from_list=()):
-        """Import a module of the project, or the objects named in from_list."""
-        imported = builtins.__import__(f"{self.name}.{module}", fromlist=from_list)
-        if not from_list:
-            # equivalent to: `import X`
-            return imported
-        objects = tuple(getattr(imported, name) for name in from_list)
-        if len(objects) > 1:
-            # equivalent to: `from X import Y1, Y2`
-            return objects
-        else:
-            # equivalent to: `from X import Y`
-            return objects[0]
+    _Project.install(location=location, name=name)
 
 
 class _Project(importlib.abc.MetaPathFinder):

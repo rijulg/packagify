@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from packagify import Packagify
+from packagify import packagify
 
 
 class SampleProject:
@@ -21,7 +21,6 @@ class SampleProject:
     __written: int = 0
 
     name: str
-    package_name: str
     location: str
     version: str
 
@@ -30,9 +29,6 @@ class SampleProject:
         # seen, so nothing it imports can be served out of the module cache
         # and no project has to be cleaned back out of it afterwards.
         self.name = f"sample_project_{uuid4().hex}"
-        # The name the project is loaded under is never the one its directory
-        # has, so that no test can pass on the two being the same.
-        self.package_name = f"package_{uuid4().hex}"
         # The major is a running count so that no two projects can come out
         # holding the same version; the minor is rolled so that nothing can
         # quietly start passing against a hardcoded one.
@@ -180,89 +176,85 @@ def sample_project(sample_projects):
 
 
 class TestImports:
-    """Loads the sample project the way a consumer of the package would."""
+    """Loads the sample project the way a consumer of the package would, which
+    is with the import statements any other package is reached by.
 
-    @pytest.fixture(autouse=True)
-    def setup(self, sample_project):
-        self.project = sample_project
-        self.package = Packagify(sample_project.location, sample_project.package_name)
-
-    def test_imports_a_single_object(self):
-        hello = self.package.import_module("main", ["hello"])
-        assert hello() == "hello world"
-
-    def test_imports_multiple_objects(self):
-        hello, version = self.package.import_module("main", ["hello", "VERSION"])
-        assert hello() == "hello world"
-        assert version == self.project.version
-
-    def test_imports_a_whole_module(self):
-        root = self.package.import_module("main")
-        assert root.main.hello() == "hello world"
-
-    def test_imports_a_sibling_once_the_module_is_already_loaded(self):
-        """A module of the project keeps its own import for as long as it lives,
-        so an import it only reaches when called still finds its siblings."""
-        hello_later = self.package.import_module("main", ["hello_later"])
-        assert hello_later() == "hello later"
-
-    def test_imports_a_module_of_a_package_of_the_project(self):
-        """`from a.b import C` is served the project's `a.b`, and the object it
-        asks for is the one on `b`, not the one on `a`."""
-        version = self.package.import_module("uses_dotted_module", ["DEEPER_VERSION"])
-        assert version == self.project.version
-
-    def test_imports_a_package_of_the_project_by_its_module(self):
-        """`import a.b` binds `a`, the same as it does anywhere else, so the
-        module reaches `b` through the package that holds it."""
-        version = self.package.import_module("imports_dotted_module", ["DEEPER_VERSION"])
-        assert version == self.project.version
-
-    def test_imports_through_a_relative_import(self):
-        """A relative import (`from .submodule import X`) is one the interpreter
-        already resolves against the package holding the module, so it is left
-        to be imported as usual rather than served out of the project."""
-        version = self.package.import_module("uses_submodule", ["VERSION"])
-        assert version == self.project.version
-
-    def test_imports_through_a_relative_path_the_module_appends(self):
-        """A relative path a module appends to `sys.path` is meant as one under
-        its own project. The module it reaches for that way is one no finder of
-        the project answers for, so the appended path is the only way there."""
-        version = self.package.import_module("uses_vendored", ["VERSION"])
-        assert version == self.project.version
-
-    def test_imports_through_an_absolute_path_the_module_appends(self):
-        """An absolute path a module appends already points where it means to,
-        so it is left as the module wrote it."""
-        version = self.package.import_module("uses_absolutely_vendored", ["VERSION"])
-        assert version == self.project.version
-
-
-class TestPlainImports:
-    """A loaded project is reached by ordinary import statements too.
-
-    `import_module` is a convenience over `__import__`, so a project loaded
-    under a name that is written where it is imported is reached the way any
-    other package is. Each test writes a name of its own, since a name is only
-    ever loaded once in a process: whoever asked for it after that would be
-    served the module cached for the project that took it first. That is what
-    the generated names the rest of the suite loads under are for.
+    A statement can only be written against a name that is written too, so each
+    test loads its project under a name of its own. A name is only ever loaded
+    once in a process: whoever asked for it after that would be served the
+    module cached for the project that took it first.
     """
 
     def test_imports_a_module_of_the_project(self, sample_project):
-        Packagify(sample_project.location, "imported_by_statement")
+        packagify(sample_project.location, "imported_by_statement")
 
         import imported_by_statement.main
 
+        assert imported_by_statement.main.hello() == "hello world"
         assert imported_by_statement.main.VERSION == sample_project.version
 
-    def test_imports_an_object_of_a_module_of_the_project(self, sample_project):
-        Packagify(sample_project.location, "imported_from_statement")
+    def test_imports_the_objects_of_a_module(self, sample_project):
+        packagify(sample_project.location, "imported_from_statement")
 
         from imported_from_statement.main import VERSION, hello
 
         assert hello() == "hello world"
+        assert VERSION == sample_project.version
+
+    def test_imports_a_sibling_once_the_module_is_already_loaded(self, sample_project):
+        """A module of the project keeps its own import for as long as it lives,
+        so an import it only reaches when called still finds its siblings."""
+        packagify(sample_project.location, "imports_a_sibling_later")
+
+        from imports_a_sibling_later.main import hello_later
+
+        assert hello_later() == "hello later"
+
+    def test_imports_a_module_of_a_package_of_the_project(self, sample_project):
+        """`from a.b import C` is served the project's `a.b`, and the object it
+        asks for is the one on `b`, not the one on `a`."""
+        packagify(sample_project.location, "imports_a_dotted_module")
+
+        from imports_a_dotted_module.uses_dotted_module import DEEPER_VERSION
+
+        assert DEEPER_VERSION == sample_project.version
+
+    def test_imports_a_package_of_the_project_by_its_module(self, sample_project):
+        """`import a.b` binds `a`, the same as it does anywhere else, so the
+        module reaches `b` through the package that holds it."""
+        packagify(sample_project.location, "imports_a_dotted_package")
+
+        from imports_a_dotted_package.imports_dotted_module import DEEPER_VERSION
+
+        assert DEEPER_VERSION == sample_project.version
+
+    def test_imports_through_a_relative_import(self, sample_project):
+        """A relative import (`from .submodule import X`) is one the interpreter
+        already resolves against the package holding the module, so it is left
+        to be imported as usual rather than served out of the project."""
+        packagify(sample_project.location, "imports_relatively")
+
+        from imports_relatively.uses_submodule import VERSION
+
+        assert VERSION == sample_project.version
+
+    def test_imports_through_a_relative_path_the_module_appends(self, sample_project):
+        """A relative path a module appends to `sys.path` is meant as one under
+        its own project. The module it reaches for that way is one no finder of
+        the project answers for, so the appended path is the only way there."""
+        packagify(sample_project.location, "appends_a_relative_path")
+
+        from appends_a_relative_path.uses_vendored import VERSION
+
+        assert VERSION == sample_project.version
+
+    def test_imports_through_an_absolute_path_the_module_appends(self, sample_project):
+        """An absolute path a module appends already points where it means to,
+        so it is left as the module wrote it."""
+        packagify(sample_project.location, "appends_an_absolute_path")
+
+        from appends_an_absolute_path.uses_absolutely_vendored import VERSION
+
         assert VERSION == sample_project.version
 
 
@@ -273,8 +265,11 @@ class TestNames:
         """The directory is only where the project is kept, so a directory that
         could never be written as an import is loaded the same as any other."""
         project = sample_projects(directory="not a package-1.2")
-        package = Packagify(project.location, project.package_name)
-        assert package.import_module("main", ["VERSION"]) == project.version
+        packagify(project.location, "named_unlike_its_directory")
+
+        from named_unlike_its_directory.main import VERSION
+
+        assert VERSION == project.version
 
     def test_imports_a_directory_that_holds_no_init(self, sample_project):
         """A directory with no `__init__.py` is the case this package is for,
@@ -282,42 +277,48 @@ class TestNames:
         imported as is built for it, so the directory is what the project's
         modules are searched for under without there being anything to run."""
         assert not (Path(sample_project.location) / "__init__.py").exists()
-        package = Packagify(sample_project.location, sample_project.package_name)
-        root = package.import_module("main")
-        assert root.__path__ == [sample_project.location]
-        assert root.main.hello() == "hello world"
+        packagify(sample_project.location, "holds_no_init")
+
+        import holds_no_init.main
+
+        assert holds_no_init.__path__ == [sample_project.location]
+        assert holds_no_init.main.hello() == "hello world"
 
     def test_runs_the_init_of_a_directory_that_is_a_package(self, sample_project):
         """A directory that does hold an `__init__.py` means it to be run, and
         it is run as one of the project's own modules."""
         init = Path(sample_project.location) / "__init__.py"
         init.write_text("from helper import greet\n\nROOT = greet('root')\n")
-        package = Packagify(sample_project.location, sample_project.package_name)
-        assert package.import_module("main").ROOT == "hello root"
+        packagify(sample_project.location, "runs_its_init")
+
+        import runs_its_init
+
+        assert runs_its_init.ROOT == "hello root"
 
     def test_keeps_the_project_a_name_already_holds(self, sample_project):
         """Loading the same project under the same name twice is the one
         project, so nothing is installed a second time."""
-        name = f"reused_{uuid4().hex}"
-        once = Packagify(sample_project.location, name=name)
+        packagify(sample_project.location, "keeps_its_name")
         installed = len(sys.meta_path)
-        again = Packagify(sample_project.location, name=name)
+        packagify(sample_project.location, "keeps_its_name")
         assert len(sys.meta_path) == installed
-        assert once.import_module("main", ["VERSION"]) == sample_project.version
-        assert again.import_module("main", ["VERSION"]) == sample_project.version
+
+        from keeps_its_name.main import VERSION
+
+        assert VERSION == sample_project.version
 
     def test_refuses_a_name_another_project_holds(self, sample_projects):
         """The first finder of a name is the one that answers for it, so a
         second project of that name would never be the one reached."""
         first, second = sample_projects(), sample_projects()
         name = f"taken_{uuid4().hex}"
-        Packagify(first.location, name=name)
+        packagify(first.location, name)
         with pytest.raises(ValueError, match=first.location):
-            Packagify(second.location, name=name)
+            packagify(second.location, name)
 
     def test_refuses_a_name_that_is_not_a_package_of_its_own(self, sample_project):
         with pytest.raises(ValueError, match="dotted.name"):
-            Packagify(sample_project.location, name="dotted.name")
+            packagify(sample_project.location, "dotted.name")
 
 
 class TestMissingProjects:
@@ -326,13 +327,13 @@ class TestMissingProjects:
     def test_refuses_a_location_that_is_not_there(self, tmp_path):
         location = tmp_path / "not_a_project"
         with pytest.raises(ModuleNotFoundError, match=str(location)):
-            Packagify(str(location), f"missing_{uuid4().hex}")
+            packagify(str(location), f"missing_{uuid4().hex}")
 
     def test_refuses_a_location_that_is_not_a_directory(self, tmp_path):
         location = tmp_path / "not_a_directory.py"
         location.write_text("")
         with pytest.raises(ModuleNotFoundError, match=str(location)):
-            Packagify(str(location), f"not_a_directory_{uuid4().hex}")
+            packagify(str(location), f"not_a_directory_{uuid4().hex}")
 
 
 class TestImportMachinery:
@@ -340,25 +341,42 @@ class TestImportMachinery:
 
     @pytest.fixture(autouse=True)
     def setup(self, sample_project):
+        """What the interpreter looked like before any module of the project
+        was run, which is what it has to look like again afterwards."""
+        self.project = sample_project
         self.original_import = builtins.__import__
         self.original_syspath = list(sys.path)
-        self.package = Packagify(sample_project.location, sample_project.package_name)
-        self.package.import_module("main", ["hello"])
 
     def test_restores_the_import_function(self):
+        packagify(self.project.location, "restores_the_import")
+
+        import restores_the_import.main
+
         assert builtins.__import__ is self.original_import
 
     def test_restores_the_sys_path(self):
+        packagify(self.project.location, "restores_the_path")
+
+        import restores_the_path.main
+
         assert sys.path == self.original_syspath
 
     def test_restores_the_sys_path_type(self):
+        packagify(self.project.location, "restores_the_path_type")
+
+        import restores_the_path_type.main
+
         assert type(sys.path) is list
 
     def test_leaves_the_module_the_loader_it_would_have_had(self):
         """Only running the module is taken over, so everything else the loader
         answers for is still answered by the one the module would have had."""
-        module = self.package.import_module("main")
-        assert module.main.__loader__.get_filename() == module.main.__file__
+        packagify(self.project.location, "keeps_its_loader")
+
+        import keeps_its_loader.main
+
+        loader = keeps_its_loader.main.__loader__
+        assert loader.get_filename() == keeps_its_loader.main.__file__
 
 
 class TestMultipleInstances:
@@ -370,15 +388,23 @@ class TestMultipleInstances:
         self.second = sample_projects()
 
     def test_each_instance_imports_its_own_project(self):
-        first = Packagify(self.first.location, self.first.package_name)
-        second = Packagify(self.second.location, self.second.package_name)
-        assert first.import_module("main", ["VERSION"]) == self.first.version
-        assert second.import_module("main", ["VERSION"]) == self.second.version
+        packagify(self.first.location, "first_of_two")
+        packagify(self.second.location, "second_of_two")
+
+        from first_of_two.main import VERSION as first
+        from second_of_two.main import VERSION as second
+
+        assert first == self.first.version
+        assert second == self.second.version
 
     def test_one_project_can_be_loaded_twice(self):
         """A name is what a project is reached by rather than what it is, so a
         directory answers under each of the names it is loaded under."""
-        once = Packagify(self.first.location, f"once_{uuid4().hex}")
-        again = Packagify(self.first.location, f"again_{uuid4().hex}")
-        assert once.import_module("main", ["VERSION"]) == self.first.version
-        assert again.import_module("main", ["VERSION"]) == self.first.version
+        packagify(self.first.location, "loaded_once")
+        packagify(self.first.location, "loaded_again")
+
+        from loaded_again.main import VERSION as again
+        from loaded_once.main import VERSION as once
+
+        assert once == self.first.version
+        assert again == self.first.version

@@ -6,9 +6,22 @@ A packaging utility to access folders that aren't suitable to be used as package
 
 ``` python
 from packagify import Packagify
-package = Packagify("/home/workspace/my_package", "my_package")
-object = package.import_module("module", ["object"])
-object1, object2 = package.import_module("module", ["object1", "object2"])
+Packagify("/home/workspace/my_package", "my_package")
+
+import my_package.module
+from my_package.module import object
+from my_package.module import object1, object2
+```
+
+Loading the folder is all there is to it: from then on its modules are reached by the import
+statements any other package's are. A name that is only known while the program runs has nothing
+to write those statements with, so it is imported the way any other computed name is:
+
+``` python
+import importlib
+
+package = Packagify(location, name)
+module = importlib.import_module(f"{package.name}.module")
 ```
 
 The name is given rather than taken from the folder, and has nothing to do with where the folder
@@ -16,11 +29,12 @@ sits or what it is called, so a folder that could never be written as an import 
 as any other:
 
 ``` python
-package = Packagify("/home/workspace/my package-1.2", "my_package")
+Packagify("/home/workspace/my package-1.2", "my_package")
 ```
 
 It is the name the project holds for as long as it is loaded, so no two projects of a process can
-be given the same one.
+be given the same one. It is a top level name like any other, so a folder loaded as `json` is what
+the rest of the process imports under that name: pick one nothing else answers for.
 
 ## How this works
 
@@ -42,8 +56,12 @@ pipenv run pytest
 ```
 
 The suite is end to end: each test writes a small folder that is deliberately not usable as a
-package into a temp dir and loads it through `Packagify`. The folder's contents are defined at the
-top of [tests/test_e2e.py](tests/test_e2e.py).
+package into a temp dir, loads it through `Packagify`, and imports it with ordinary import
+statements. The folder's contents are defined at the top of [tests/test_e2e.py](tests/test_e2e.py).
+
+Each test loads its folder under a name of its own, since a statement can only be written against
+a name that is written too, and a name is only ever loaded once in a process: whoever asked for it
+after that would be served the module cached for the project that took it first.
 
 In VSCode the tests are discovered by the Python extension (see `.vscode/settings.json`); pick the
 interpreter that has `pytest` installed, then use the Testing panel or the `Test` task.
