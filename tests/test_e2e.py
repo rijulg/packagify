@@ -72,13 +72,20 @@ class SampleProject:
                 """
             },
             {
-                "path": "uses_submodule_syspath.py",
+                # a directory down, so no finder of the project answers for it
+                "path": "vendor/vendored.py",
+                "content": f"""
+                    VERSION = "{self.version}"
+                """
+            },
+            {
+                "path": "uses_vendored.py",
                 "content": f"""
                     import sys
 
-                    sys.path.append("submodule")
+                    sys.path.append("vendor")
 
-                    from submodule import VERSION
+                    from vendored import VERSION
                 """
             }
         ]
@@ -160,7 +167,10 @@ class TestImports:
         assert version == self.project.version
 
     def test_imports_through_a_relative_path_the_module_appends(self):
-        version = self.package.import_module("uses_submodule_syspath", ["VERSION"])
+        """A relative path a module appends to `sys.path` is meant as one under
+        its own project. The module it reaches for that way is one no finder of
+        the project answers for, so the appended path is the only way there."""
+        version = self.package.import_module("uses_vendored", ["VERSION"])
         assert version == self.project.version
 
 
