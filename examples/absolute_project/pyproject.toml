@@ -1,0 +1,15 @@
+[project]
+name = "absolute-example"
+version = "0.1.0"
+dependencies = ["packagify"]
+
+# A location that is absolute is taken as it is written, rather than as one
+# under this file, so a folder that lives nowhere near the repository is
+# declared the same way as one inside it.
+#
+# This path is deliberately somewhere every posix machine has, so that the
+# example runs anywhere. A real one would be a shared mount, a vendor drop, or
+# a checkout sitting beside this one - and would be true of that machine only,
+# which is the reason to prefer a relative location whenever there is one.
+[tool.packagify]
+shared = "/tmp/packagify-example-shared-toolkit"

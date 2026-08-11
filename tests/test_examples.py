@@ -55,6 +55,19 @@ def test_the_loaded_example_runs(example):
     assert printed.strip() == "500g is 17.64oz"
 
 
+def test_the_absolute_example_runs(example):
+    """A folder outside the repository, declared by the path it really has.
+
+    The folder is put where the declaration says before anything imports it,
+    the way whatever really puts it there would have."""
+    placed = example("absolute_project/place_the_folder.py")
+    assert placed.startswith("placed shared at ")
+
+    printed = example("absolute_project/src/main.py")
+
+    assert printed.splitlines() == ["=" * 19, "from a shared drive", "=" * 19]
+
+
 def test_every_example_is_run_by_this_file():
     """A new example that nothing here runs is one that can quietly rot."""
     scripts = {
@@ -65,4 +78,5 @@ def test_every_example_is_run_by_this_file():
     assert scripts == {
         os.path.join("declared_project", "src", "main.py"),
         os.path.join("loaded_project", "main.py"),
+        os.path.join("absolute_project", "src", "main.py"),
     }

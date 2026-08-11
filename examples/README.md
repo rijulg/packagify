@@ -1,10 +1,13 @@
 # Examples
 
-Two working folders, one per way of using packagify. Run them from the repository root:
+Three working folders, one per way of naming a project. Run them from the repository root:
 
 ``` bash
 PYTHONPATH=. python "examples/declared_project/src/main.py"
 PYTHONPATH=. python examples/loaded_project/main.py
+
+python examples/absolute_project/place_the_folder.py
+PYTHONPATH=. python examples/absolute_project/src/main.py
 ```
 
 `PYTHONPATH=.` is only needed because packagify is not installed into this repository's own
@@ -39,6 +42,27 @@ Neither folder could be written as an import — `legacy report tool v2` and `to
 — and the first one's modules import each other (`from renderer import render`) the way a script
 run from inside the folder would. That last part is the half no amount of installing or path
 juggling can fix, and it is the reason packagify exists.
+
+## absolute_project
+
+The same declaration, holding a location that is absolute:
+
+``` toml
+[tool.packagify]
+shared = "/tmp/packagify-example-shared-toolkit"
+```
+
+A location under the declaring file is read as one under it; a location that is absolute is taken
+as it is written. So a folder that lives nowhere near the repository — a shared mount, an unzipped
+vendor drop, a checkout sitting beside this one — is declared the same way as one inside it, and
+`src/main.py` writes the same import either way.
+
+That path is the whole reason to prefer a relative location whenever there is one: it is true of
+one machine rather than of the code, so it cannot be committed and expected to hold for anyone
+else. This example works around that the only way an example can, by putting the folder there
+first — `place_the_folder.py` reads the declaration and creates what it names, standing in for
+whatever really puts a folder outside a repository. The path is under `/tmp` so that the example
+runs on any posix machine; on Windows it would need one of that machine's own.
 
 ## loaded_project
 
