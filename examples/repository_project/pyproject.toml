@@ -1,0 +1,16 @@
+[project]
+name = "repository-example"
+version = "0.1.0"
+dependencies = ["packagify"]
+
+# A location that names a git repository is fetched rather than looked for on
+# this machine, written the way pip takes a requirement: a version to pin to,
+# and the folder inside the repository to import. The fetch is done by the first
+# import that asks for it, and the checkout is kept in this machine's cache.
+#
+# A real one would be a repository on a host, and a private one would read its
+# token out of the environment with ${NAME} rather than hold it here. This one is
+# made by `make_the_repository.py`, so the example runs with no network and no
+# credentials to depend on.
+[tool.packagify]
+identifiers = "git+file:///tmp/packagify-example-repository@v1.0#subdirectory=tools/id numbers"

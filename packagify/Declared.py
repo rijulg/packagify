@@ -7,6 +7,7 @@ import tomllib
 from pathlib import Path
 
 from .Project import Project
+from .Repository import Repository
 
 class Declared(importlib.abc.MetaPathFinder):
     """The projects a declaration holds, as modules of this package.
@@ -37,7 +38,9 @@ class Declared(importlib.abc.MetaPathFinder):
             # a name nothing declares, or a module of a project that is already
             # answered for by the finder installed for the project itself
             return None
-        project = Project.install(location=location, name=fullname)
+        # a repository is fetched here rather than where the declaration is read,
+        # so only the folder an import asks for is ever fetched
+        project = Project.install(location=Repository.folder(location), name=fullname)
         return project.find_spec(fullname, path, target)
 
     def __declarations(self, directory):
@@ -58,9 +61,11 @@ class Declared(importlib.abc.MetaPathFinder):
     def __declared_at(directory):
         """The projects declared in `directory`, or None if it declares nothing.
 
-        Locations are resolved against the declaring file rather than the working
-        directory. Read once per directory, so answering an import twice costs
-        nothing; the cached result is shared, so it is never modified.
+        A location is resolved against the declaring file rather than the working
+        directory; one that names a repository is left as it was written, since
+        what it points at is not on this machine yet. Read once per directory, so
+        answering an import twice costs nothing; the cached result is shared, so
+        it is never modified.
         """
         declaration = directory / Declared.DECLARATION
         if not declaration.is_file():
@@ -70,7 +75,8 @@ class Declared(importlib.abc.MetaPathFinder):
         if declared is None:
             return None
         return {
-            name: os.path.join(directory, location)
+            name: location if Repository.is_named_by(location)
+            else os.path.join(directory, location)
             for name, location in declared.items()
         }
 

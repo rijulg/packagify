@@ -18,11 +18,11 @@ EXAMPLES = ROOT / "examples"
 def example():
     """Run an example as the README says to, and hand back its output."""
 
-    def run(script):
+    def run(script, **environment):
         finished = subprocess.run(
             [sys.executable, str(EXAMPLES / script)],
             cwd=ROOT,
-            env={**os.environ, "PYTHONPATH": str(ROOT)},
+            env={**os.environ, "PYTHONPATH": str(ROOT), **environment},
             capture_output=True,
             text=True,
             check=False,
@@ -66,6 +66,26 @@ def test_the_absolute_example_runs(example):
     assert printed.splitlines() == ["=" * 19, "from a shared drive", "=" * 19]
 
 
+def test_the_repository_example_runs(example, tmp_path):
+    """A folder fetched out of a git repository, pinned to a tag.
+
+    The repository is made before anything imports it, and it is fetched into a
+    cache of this test's own rather than the machine's, so what the example prints
+    came out of the repository as it is now."""
+    made = example("repository_project/make_the_repository.py")
+    assert made.startswith("made identifiers at ")
+    assert made.rstrip().endswith("tagged v1.0")
+
+    printed = example(
+        "repository_project/src/main.py", PACKAGIFY_CACHE=str(tmp_path / "cache")
+    )
+
+    assert printed.splitlines() == [
+        "4137 8947 1175 5904: valid",
+        "4137 8947 1175 5905: invalid",
+    ]
+
+
 def test_every_example_is_run_by_this_file():
     """A new example that nothing here runs is one that can quietly rot."""
     scripts = {
@@ -77,4 +97,5 @@ def test_every_example_is_run_by_this_file():
         os.path.join("declared_project", "src", "main.py"),
         os.path.join("loaded_project", "main.py"),
         os.path.join("absolute_project", "src", "main.py"),
+        os.path.join("repository_project", "src", "main.py"),
     }
