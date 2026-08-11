@@ -9,6 +9,7 @@ from pathlib import Path
 from .Project import Project
 from .Repository import Repository
 
+
 class Declared(importlib.abc.MetaPathFinder):
     """The projects a declaration holds, as modules of this package.
 
@@ -17,6 +18,7 @@ class Declared(importlib.abc.MetaPathFinder):
     call. This finder goes on the end of `sys.meta_path`, so it only answers for
     names nothing else could.
     """
+
     DECLARATION = "pyproject.toml"
     PACKAGE = __package__
     PREFIX = f"{PACKAGE}."
@@ -33,7 +35,7 @@ class Declared(importlib.abc.MetaPathFinder):
         if not fullname.startswith(self.PREFIX):
             return None
         directory = self.__calling_directory()
-        location = self.__declarations(directory).get(fullname[len(self.PREFIX):])
+        location = self.__declarations(directory).get(fullname[len(self.PREFIX) :])
         if location is None:
             # a name nothing declares, or a module of a project that is already
             # answered for by the finder installed for the project itself
@@ -75,8 +77,11 @@ class Declared(importlib.abc.MetaPathFinder):
         if declared is None:
             return None
         return {
-            name: location if Repository.is_named_by(location)
-            else os.path.join(directory, location)
+            name: (
+                location
+                if Repository.is_named_by(location)
+                else os.path.join(directory, location)
+            )
             for name, location in declared.items()
         }
 
@@ -85,7 +90,9 @@ class Declared(importlib.abc.MetaPathFinder):
         frame = sys._getframe(1)
         while frame is not None:
             file = frame.f_globals.get("__file__")
-            if file is not None and not os.path.abspath(file).startswith(self.__MACHINERY):
+            if file is not None and not os.path.abspath(file).startswith(
+                self.__MACHINERY
+            ):
                 return os.path.dirname(os.path.abspath(file))
             frame = frame.f_back
         # a caller with no file of its own, such as a REPL, means where it is run from

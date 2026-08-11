@@ -89,11 +89,15 @@ class TestDeclaredProjects:
         and was never installed. Its own modules still import each other."""
         written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
 
-        app = run(written, "app.py", """
+        app = run(
+            written,
+            "app.py",
+            """
             from packagify.my_app.main import hello
 
             GREETING = hello()
-        """)
+        """,
+        )
 
         assert app.GREETING == "hello world"
 
@@ -106,11 +110,15 @@ class TestDeclaredProjects:
         published.mkdir(parents=True)
         (published / "pyproject.toml").write_text("[project]\nname = 'thing'\n")
 
-        app = run(written, "packages/thing/app.py", """
+        app = run(
+            written,
+            "packages/thing/app.py",
+            """
             from packagify.my_app.main import hello
 
             GREETING = hello()
-        """)
+        """,
+        )
 
         assert app.GREETING == "hello world"
 
@@ -119,11 +127,15 @@ class TestDeclaredProjects:
         frames between question and answer without making it the caller."""
         written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
 
-        app = run(written, "app.py", """
+        app = run(
+            written,
+            "app.py",
+            """
             import importlib.util
 
             FOUND = importlib.util.find_spec("packagify.my_app") is not None
-        """)
+        """,
+        )
 
         assert app.FOUND is True
 
@@ -132,7 +144,10 @@ class TestDeclaredProjects:
         reaches it, and a name nothing answers for still fails as usual."""
         written = repository(DECLARES_MY_APP, {"weird project 1.2": NOT_A_PACKAGE})
 
-        app = run(written, "app.py", """
+        app = run(
+            written,
+            "app.py",
+            """
             import json
 
             STDLIB = json.__name__
@@ -141,7 +156,8 @@ class TestDeclaredProjects:
                 MISSING = None
             except ModuleNotFoundError as error:
                 MISSING = str(error)
-        """)
+        """,
+        )
 
         assert app.STDLIB == "json"
         assert app.MISSING == "No module named 'not_a_module_anywhere'"

@@ -78,7 +78,11 @@ def origin(tmp_path):
 
     def git(*arguments):
         return subprocess.run(
-            ("git", *arguments), cwd=directory, check=True, capture_output=True, text=True
+            ("git", *arguments),
+            cwd=directory,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout.strip()
 
     git("init", "--quiet", "--initial-branch", "main")
@@ -194,11 +198,14 @@ class TestFoldersOutOfARepository:
             text = "{origin.url}@v1.0{origin.text_tools}"
         """)
 
-        app = run(written, """
+        app = run(
+            written,
+            """
             from packagify.text.formatting import banner
 
             BANNER = banner("hi")
-        """)
+        """,
+        )
 
         assert app.BANNER == BANNER
 
@@ -261,14 +268,20 @@ class TestRepositoriesThatDoNotHold:
 
     def test_refuses_a_folder_the_repository_does_not_hold(self, origin):
         with pytest.raises(ModuleNotFoundError, match="tools/not there"):
-            packagify(f"{origin.url}@v1.0#subdirectory=tools/not there", "a_missing_folder")
+            packagify(
+                f"{origin.url}@v1.0#subdirectory=tools/not there", "a_missing_folder"
+            )
 
     def test_refuses_a_variable_the_environment_does_not_hold(self, monkeypatch):
         monkeypatch.delenv("NOT_IN_THE_ENVIRONMENT", raising=False)
         with pytest.raises(ModuleNotFoundError, match="NOT_IN_THE_ENVIRONMENT"):
-            packagify("git+file://${NOT_IN_THE_ENVIRONMENT}/toolkit@v1.0", "an_unset_variable")
+            packagify(
+                "git+file://${NOT_IN_THE_ENVIRONMENT}/toolkit@v1.0", "an_unset_variable"
+            )
 
-    def test_keeps_what_a_variable_held_out_of_what_it_reports(self, monkeypatch, tmp_path):
+    def test_keeps_what_a_variable_held_out_of_what_it_reports(
+        self, monkeypatch, tmp_path
+    ):
         """git quotes the url it could not reach, which is the url with the token
         in it, so what the environment held is put back as its name."""
         secret = f"t0ken-{uuid4().hex}"
@@ -286,7 +299,9 @@ class TestRepositoriesThatDoNotHold:
         of the message, so nothing is put back for it."""
         monkeypatch.setenv("AN_EMPTY_TOKEN", "")
         with pytest.raises(ModuleNotFoundError) as refused:
-            packagify(f"git+file://{tmp_path}/${{AN_EMPTY_TOKEN}}nowhere@v1.0", "an_empty")
+            packagify(
+                f"git+file://{tmp_path}/${{AN_EMPTY_TOKEN}}nowhere@v1.0", "an_empty"
+            )
 
         # what git said about the url it was given, still readable
         assert str(tmp_path / "nowhere") in str(refused.value)
@@ -326,8 +341,11 @@ class TestCheckoutsThatRaceEachOther:
 
         assert banner("hi") == BANNER
 
-    def test_refuses_a_checkout_it_could_not_put_in_place_at_all(self, origin, monkeypatch):
+    def test_refuses_a_checkout_it_could_not_put_in_place_at_all(
+        self, origin, monkeypatch
+    ):
         """Nothing is there to have lost the race to, so the failure is real."""
+
         def fail(staging, checkout):
             raise OSError(13, "Permission denied")
 

@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from urllib.parse import parse_qsl, urlsplit
 
+
 class Repository:
     """A folder that lives in a git repository rather than on this machine.
 
@@ -47,7 +48,7 @@ class Repository:
         return cls(location).__folder()
 
     def __init__(self, location):
-        url, _, fragment = location[len(self.PREFIX):].partition("#")
+        url, _, fragment = location[len(self.PREFIX) :].partition("#")
         self.__url, self.__version = self.__pinned(url)
         # a fragment holds fields rather than one value, as pip's does
         self.__subdirectory = dict(parse_qsl(fragment)).get("subdirectory", "")
@@ -90,7 +91,9 @@ class Repository:
         override = os.environ.get(self.CACHE)
         if override:
             return override
-        home = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+        home = os.environ.get("XDG_CACHE_HOME") or os.path.join(
+            os.path.expanduser("~"), ".cache"
+        )
         return os.path.join(home, __package__)
 
     def __key(self):
@@ -119,7 +122,9 @@ class Repository:
         try:
             self.__git(staging, "init", "--quiet")
             self.__git(staging, "remote", "add", "origin", self.__expanded(self.__url))
-            self.__git(staging, "fetch", "--quiet", "--depth", "1", "origin", self.__version)
+            self.__git(
+                staging, "fetch", "--quiet", "--depth", "1", "origin", self.__version
+            )
             self.__git(staging, "checkout", "--quiet", "--detach", "FETCH_HEAD")
             self.__move(staging, checkout)
         finally:
@@ -170,6 +175,7 @@ class Repository:
         is committed, which is how pip reads a requirement too. A name the
         environment does not hold is the declaration's fault, so it is named.
         """
+
         def value(match):
             name = match.group(1)
             if name not in os.environ:

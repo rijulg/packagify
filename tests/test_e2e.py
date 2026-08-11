@@ -39,7 +39,7 @@ class SampleProject:
                 "content": """
                     def greet(who):
                         return f"hello {who}"
-                """
+                """,
             },
             {
                 "path": "main.py",
@@ -55,19 +55,19 @@ class SampleProject:
                         from helper import greet
 
                         return greet("later")
-                """
+                """,
             },
             {
                 "path": "submodule/__init__.py",
                 "content": f"""
                     VERSION = "{self.version}"
-                """
+                """,
             },
             {
                 "path": "uses_submodule.py",
                 "content": f"""
                     from .submodule import VERSION
-                """
+                """,
             },
             {
                 # a name of its own, so that reaching it through the package
@@ -75,13 +75,13 @@ class SampleProject:
                 "path": "submodule/deeper.py",
                 "content": f"""
                     DEEPER_VERSION = "{self.version}"
-                """
+                """,
             },
             {
                 "path": "uses_dotted_module.py",
                 "content": """
                     from submodule.deeper import DEEPER_VERSION
-                """
+                """,
             },
             {
                 "path": "imports_dotted_module.py",
@@ -89,14 +89,14 @@ class SampleProject:
                     import submodule.deeper
 
                     DEEPER_VERSION = submodule.deeper.DEEPER_VERSION
-                """
+                """,
             },
             {
                 # a directory down, so no finder of the project answers for it
                 "path": "vendor/vendored.py",
                 "content": f"""
                     VERSION = "{self.version}"
-                """
+                """,
             },
             {
                 "path": "uses_vendored.py",
@@ -106,7 +106,7 @@ class SampleProject:
                     sys.path.append("vendor")
 
                     from vendored import VERSION
-                """
+                """,
             },
             {
                 # a name of its own, so that the module reaching it this way
@@ -114,7 +114,7 @@ class SampleProject:
                 "path": "vendor/vendored_absolutely.py",
                 "content": f"""
                     VERSION = "{self.version}"
-                """
+                """,
             },
             {
                 "path": "uses_absolutely_vendored.py",
@@ -125,8 +125,8 @@ class SampleProject:
                     sys.path.append(os.path.join(os.path.dirname(__file__), "vendor"))
 
                     from vendored_absolutely import VERSION
-                """
-            }
+                """,
+            },
         ]
 
     def write(self, parent, directory=None):
@@ -247,7 +247,9 @@ class TestImports:
 class TestNames:
     """The name a project is imported under is its own, not its directory's."""
 
-    def test_imports_a_directory_that_could_not_be_named_as_a_package(self, sample_projects):
+    def test_imports_a_directory_that_could_not_be_named_as_a_package(
+        self, sample_projects
+    ):
         """The directory is only where the project is kept, so one that could
         never be written as an import loads the same as any other."""
         project = sample_projects(directory="not a package-1.2")

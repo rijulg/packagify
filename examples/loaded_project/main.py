@@ -15,6 +15,5 @@ packagify(TOOLKIT, "acme")
 # written after the call, since the name does not exist until the call is made
 from acme.scales import weigh  # noqa: E402
 
-
 if __name__ == "__main__":
     print(weigh(500))

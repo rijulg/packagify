@@ -62,8 +62,14 @@ def make(repository, folder, version):
         # an identity for the commit, given here so that a machine without one
         # configured can still run the example
         subprocess.run(
-            ("git", "-c", "user.email=example@packagify", "-c", "user.name=example",
-             *arguments),
+            (
+                "git",
+                "-c",
+                "user.email=example@packagify",
+                "-c",
+                "user.name=example",
+                *arguments,
+            ),
             cwd=repository,
             check=True,
             capture_output=True,

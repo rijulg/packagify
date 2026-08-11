@@ -4,6 +4,7 @@ from .Declared import Declared
 from .Project import Project
 from .Repository import Repository
 
+
 def packagify(location, name):
     """Load the project at `location` so it can be imported as `name`.
 

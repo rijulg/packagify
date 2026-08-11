@@ -4,6 +4,7 @@ import sys
 
 from .SysPath import SysPath
 
+
 class Loader(importlib.abc.Loader):
     """Runs a module of the project the way the module expects to be run.
 
@@ -11,7 +12,8 @@ class Loader(importlib.abc.Loader):
     otherwise have had.
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         loader: importlib.abc.Loader,
         new_path: SysPath,
         import_func: any,

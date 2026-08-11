@@ -8,6 +8,7 @@ from importlib.machinery import ModuleSpec, PathFinder
 from .Loader import Loader
 from .SysPath import SysPath
 
+
 class Project(importlib.abc.MetaPathFinder):
     """A project, as a finder of the modules it holds."""
 
@@ -28,7 +29,9 @@ class Project(importlib.abc.MetaPathFinder):
                     )
                 return finder
         if not os.path.isdir(location):
-            raise ModuleNotFoundError(f"Invalid location: {location} provided for module: {name}")
+            raise ModuleNotFoundError(
+                f"Invalid location: {location} provided for module: {name}"
+            )
         project = cls(location=location, name=name)
         sys.meta_path.insert(0, project)
         return project
@@ -44,7 +47,9 @@ class Project(importlib.abc.MetaPathFinder):
             spec = self.__spec_of_the_project(fullname)
         elif fullname.startswith(f"{self.__name}."):
             # a module of the project, searched for where the project keeps it
-            spec = PathFinder.find_spec(fullname, list(path or [self.__location]), target)
+            spec = PathFinder.find_spec(
+                fullname, list(path or [self.__location]), target
+            )
         else:
             return None
         if spec is not None and hasattr(spec.loader, "exec_module"):

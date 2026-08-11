@@ -1,5 +1,6 @@
 import os
 
+
 class SysPath(list):
     """A `sys.path` that resolves an appended relative path against the project."""
 
