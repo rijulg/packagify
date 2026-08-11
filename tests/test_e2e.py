@@ -34,33 +34,54 @@ class SampleProject:
         SampleProject.__written += 1
         self.version = f"{SampleProject.__written}.{random.randint(0, 99)}"
 
-    def helper(self):
-        return """
-            def greet(who):
-                return f"hello {who}"
-        """
+    def __files(self):
+        return [
+            {
+                "path": "helper.py",
+                "content": """
+                    def greet(who):
+                        return f"hello {who}"
+                """
+            },
+            {
+                "path": "main.py",
+                "content": f"""
+                    from helper import greet
 
-    def main(self):
-        return f"""
-            from helper import greet
+                    VERSION = "{self.version}"
 
-            VERSION = "{self.version}"
+                    def hello():
+                        return greet("world")
 
-            def hello():
-                return greet("world")
+                    def hello_later():
+                        from helper import greet
 
-            def hello_later():
-                from helper import greet
-
-                return greet("later")
-        """
+                        return greet("later")
+                """
+            },
+            {
+                "path": "submodule/__init__.py",
+                "content": f"""
+                    VERSION = "{self.version}"
+                """
+            },
+            {
+                "path": "uses_submodule.py",
+                "content": f"""
+                    from .submodule import VERSION
+                """
+            }
+        ]
 
     def write(self, parent):
         """Write the folder into `parent` and return where it landed."""
         location = parent / self.name
         location.mkdir()
-        for file in (self.helper, self.main):
-            (location / f"{file.__name__}.py").write_text(dedent(file()).lstrip())
+        for file in self.__files():
+            file_path = location / file["path"]
+            file_content = dedent(file["content"]).lstrip()
+            file_path.parent.mkdir(exist_ok=True, parents=True)
+            file_path.write_text(file_content)
         self.location = str(location)
         return self.location
 
@@ -121,6 +142,12 @@ class TestImports:
         so an import it only reaches when called still finds its siblings."""
         hello_later = self.package.import_module("main", ["hello_later"])
         assert hello_later() == "hello later"
+
+    def test_imports_through_a_relative_path_the_module_appends(self):
+        """A relative path a module puts on `sys.path` is meant as its own
+        project's, not as one of wherever the interpreter was started."""
+        version = self.package.import_module("uses_submodule", ["VERSION"])
+        assert version == self.project.version
 
 
 class TestImportMachinery:
