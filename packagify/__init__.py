@@ -2,7 +2,7 @@ import builtins
 import os
 import sys
 from uuid import uuid4
-from importlib.abc import MetaPathFinder
+import importlib.abc
 from importlib.machinery import PathFinder
 
 
@@ -39,10 +39,8 @@ class Packagify:
     """
 
     def __init__(self, location):
-        name = os.path.basename(location)
-        self.project = _Project.install(location=location, name=name)
-        self.name = name
-        self.location = self.project.location
+        self.name = os.path.basename(location)
+        _Project.install(location=location, name=self.name)
 
     def import_module(self, module, from_list=()):
         """Import a module of the project, or the objects named in from_list."""
@@ -59,84 +57,61 @@ class Packagify:
             return objects[0]
 
 
-class _Project(MetaPathFinder):
+class _Project(importlib.abc.MetaPathFinder):
     """A project, as a finder of the modules it holds."""
 
     @classmethod
-    def install(cls, location, name):
-        """The project at `location`, on `sys.meta_path` if it wasn't already."""
-        # an absolute location so that the project keeps being found from
-        # anywhere, whatever directory the process moves on to
-        location = os.path.abspath(location)
+    def install(cls, name: str, location: str):
+        """
+        Idempotent installer
+        if `Project` already exists in `sys.meta_path` then return that. 
+        Otherwise, create an instance of the `Project` and add it to `sys.meta_path`.
+        """
         for finder in sys.meta_path:
-            if isinstance(finder, cls) and finder.location == location:
+            if isinstance(finder, cls) and finder.__name == name:
                 return finder
+        if not os.path.isdir(location):
+            raise ModuleNotFoundError(f"Invalid location: {location} provided for module: {name}")
         project = cls(location=location, name=name)
         sys.meta_path.insert(0, project)
-        return project
 
-    def __init__(self, location, name):
-        self.location = location
-        self.name = name
-        if not os.path.isdir(location):
-            raise ModuleNotFoundError(f"No module named {self.name!r}", name=self.name)
-        self.builtins = dict(vars(builtins), __import__=self.__import)
+    def __init__(self, name: str, location: str):
+        self.__location = location
+        self.__name = name
 
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == self.name:
+        if fullname == self.__name:
             # the project itself, found under its own directory's name
-            path = [os.path.dirname(self.location)]
-        elif fullname.startswith(f"{self.name}."):
+            path = [os.path.dirname(self.__location)]
+        elif fullname.startswith(f"{self.__name}."):
             # a module of the project, searched for where the project keeps it
-            path = list(path or [self.location])
+            path = list(path or [self.__location])
         else:
             return None
         spec = PathFinder.find_spec(fullname, path, target)
         if spec is not None and hasattr(spec.loader, "exec_module"):
-            spec.loader = _Loader(spec.loader, self)
+            spec.loader = _Loader(
+                loader=spec.loader,
+                import_func=self.__import,
+                new_path=_SysPath(sys.path, self.__location),
+            )
         return spec
 
     def provides(self, name):
         """Whether the module `name` asks for is one of the project's own."""
-        return self.find_spec(f"{self.name}.{name.partition('.')[0]}") is not None
+        return self.find_spec(f"{self.__name}.{name.partition('.')[0]}") is not None
 
     def __import(self, name, globals=None, locals=None, fromlist=(), level=0):
         """The `__import__` the project's own modules are run with."""
-        if level or not self.provides(name):
+        if level > 0 or not self.provides(name):
             return builtins.__import__(name, globals, locals, fromlist, level)
         module = builtins.__import__(
-            f"{self.name}.{name}", globals, locals, fromlist, 0
+            f"{self.__name}.{name}", globals, locals, fromlist, 0
         )
         if fromlist:
             return module
         # `import a.b` binds `a`, the same as it does anywhere else
-        return sys.modules[f"{self.name}.{name.partition('.')[0]}"]
-
-
-class _Loader:
-    """Runs a module of the project the way the module expects to be run.
-
-    Everything but running the module is left to the loader the module would
-    have been given otherwise.
-    """
-
-    def __init__(self, loader, project):
-        self.loader = loader
-        self.project = project
-
-    def __getattr__(self, attribute):
-        return getattr(self.loader, attribute)
-
-    def exec_module(self, module):
-        # a module carries its own builtins, so the project's import is the one
-        # its code sees for as long as it lives, imports made after loading too
-        module.__dict__["__builtins__"] = self.project.builtins
-        path = sys.path
-        sys.path = _SysPath(path, self.project.location)
-        try:
-            self.loader.exec_module(module)
-        finally:
-            sys.path = path
+        return sys.modules[f"{self.__name}.{name.partition('.')[0]}"]
 
 
 class _SysPath(list):
@@ -144,9 +119,39 @@ class _SysPath(list):
 
     def __init__(self, entries, location):
         super().__init__(entries)
-        self.location = location
+        self.__location = location
 
     def append(self, entry):
         if not os.path.isabs(entry):
-            entry = os.path.join(self.location, entry)
+            entry = os.path.join(self.__location, entry)
         super().append(entry)
+
+class _Loader(importlib.abc.Loader):
+    """Runs a module of the project the way the module expects to be run.
+
+    Everything but running the module is left to the loader the module would
+    have been given otherwise.
+    """
+
+    def __init__(self,
+        loader: importlib.abc.Loader,
+        new_path: _SysPath,
+        import_func: any,
+    ):
+        self.__loader = loader
+        self.__builtins = dict(vars(builtins), __import__=import_func)
+        self.__new_path = new_path
+
+    def __getattr__(self, attribute):
+        return getattr(self.__loader, attribute)
+
+    def exec_module(self, module):
+        # override sys.path and module.__builtins__ and load the module
+        # then return sys.path to original
+        path = sys.path
+        try:
+            sys.path = self.__new_path
+            module.__dict__["__builtins__"] = self.__builtins
+            self.__loader.exec_module(module)
+        finally:
+            sys.path = path
