@@ -6,10 +6,6 @@ import importlib.abc
 import importlib.util
 from importlib.machinery import ModuleSpec, PathFinder
 
-DECLARATION = "pyproject.toml"
-
-# the frames between a module's import statement and the finder answering it
-_MACHINERY = ("importlib._bootstrap", "importlib._bootstrap_external", "importlib", __name__)
 
 
 def packagify(location, name):
@@ -61,38 +57,6 @@ def packagify(location, name):
     _Project.install(location=location, name=name)
 
 
-def _calling_directory():
-    """The directory of the file whose import statement is being answered."""
-    frame = sys._getframe(1)
-    while frame is not None:
-        if frame.f_globals.get("__name__") not in _MACHINERY and "__file__" in frame.f_globals:
-            return os.path.dirname(os.path.abspath(frame.f_globals["__file__"]))
-        frame = frame.f_back
-    # a caller with no file of its own, such as a REPL, means where it is run from
-    return os.getcwd()  # pragma: no cover
-
-
-def _declarations(directory):
-    """The projects the nearest declaration above `directory` holds.
-
-    The locations are read as the declaring file means them, which is relative
-    to the directory holding it rather than to wherever python was started.
-    """
-    while True:
-        declaration = os.path.join(directory, DECLARATION)
-        if os.path.isfile(declaration):
-            with open(declaration, "rb") as file:
-                declared = tomllib.load(file).get("tool", {}).get(__name__, {})
-            return {
-                name: os.path.join(directory, location)
-                for name, location in declared.items()
-            }
-        parent = os.path.dirname(directory)
-        if parent == directory:
-            return {}
-        directory = parent
-
-
 class _Declared(importlib.abc.MetaPathFinder):
     """The projects a declaration holds, as modules of this package.
 
@@ -101,20 +65,52 @@ class _Declared(importlib.abc.MetaPathFinder):
     The finder goes on the end of `sys.meta_path` rather than the front, so it
     only ever answers for a name that nothing else could.
     """
-
+    DECLARATION = "pyproject.toml"
     PREFIX = f"{__name__}."
+    # the frames between a module's import statement and the finder answering it
+    __MACHINERY = ("importlib._bootstrap", "importlib._bootstrap_external", "importlib", __name__)
 
     def find_spec(self, fullname, path=None, target=None):
         if not fullname.startswith(self.PREFIX):
             return None
-        directory = _calling_directory()
-        location = _declarations(directory).get(fullname[len(self.PREFIX):])
+        directory = self.__calling_directory()
+        location = self.__declarations(directory).get(fullname[len(self.PREFIX):])
         if location is None:
             # a name nothing declares, or a module of a project that is already
             # answered for by the finder installed for the project itself
             return None
         project = _Project.install(location=location, name=fullname)
         return project.find_spec(fullname, path, target)
+    
+    def __declarations(self, directory):
+        """The projects the nearest declaration above `directory` holds.
+
+        The locations are read as the declaring file means them, which is relative
+        to the directory holding it rather than to wherever python was started.
+        """
+        while True:
+            declaration = os.path.join(directory, self.DECLARATION)
+            if os.path.isfile(declaration):
+                with open(declaration, "rb") as file:
+                    declared = tomllib.load(file).get("tool", {}).get(__name__, {})
+                return {
+                    name: os.path.join(directory, location)
+                    for name, location in declared.items()
+                }
+            parent = os.path.dirname(directory)
+            if parent == directory:
+                return {}
+            directory = parent
+
+    def __calling_directory(self):
+        """The directory of the file whose import statement is being answered."""
+        frame = sys._getframe(1)
+        while frame is not None:
+            if frame.f_globals.get("__name__") not in self.__MACHINERY and "__file__" in frame.f_globals:
+                return os.path.dirname(os.path.abspath(frame.f_globals["__file__"]))
+            frame = frame.f_back
+        # a caller with no file of its own, such as a REPL, means where it is run from
+        return os.getcwd()  # pragma: no cover
 
 
 class _Project(importlib.abc.MetaPathFinder):
