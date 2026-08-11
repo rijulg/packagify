@@ -109,6 +109,25 @@ class SampleProject:
 
                     from vendored import VERSION
                 """
+            },
+            {
+                # a name of its own, so that the module reaching it this way
+                # cannot be served the one the relative path reached
+                "path": "vendor/vendored_absolutely.py",
+                "content": f"""
+                    VERSION = "{self.version}"
+                """
+            },
+            {
+                "path": "uses_absolutely_vendored.py",
+                "content": """
+                    import os
+                    import sys
+
+                    sys.path.append(os.path.join(os.path.dirname(__file__), "vendor"))
+
+                    from vendored_absolutely import VERSION
+                """
             }
         ]
 
@@ -207,6 +226,27 @@ class TestImports:
         version = self.package.import_module("uses_vendored", ["VERSION"])
         assert version == self.project.version
 
+    def test_imports_through_an_absolute_path_the_module_appends(self):
+        """An absolute path a module appends already points where it means to,
+        so it is left as the module wrote it."""
+        version = self.package.import_module("uses_absolutely_vendored", ["VERSION"])
+        assert version == self.project.version
+
+
+class TestMissingProjects:
+    """A location that holds no project is not one."""
+
+    def test_refuses_a_location_that_is_not_there(self, tmp_path):
+        location = tmp_path / "not_a_project"
+        with pytest.raises(ModuleNotFoundError, match=str(location)):
+            Packagify(str(location))
+
+    def test_refuses_a_location_that_is_not_a_directory(self, tmp_path):
+        location = tmp_path / "not_a_directory.py"
+        location.write_text("")
+        with pytest.raises(ModuleNotFoundError, match=str(location)):
+            Packagify(str(location))
+
 
 class TestImportMachinery:
     """Everything hijacked during the import has to be handed back afterwards."""
@@ -226,6 +266,12 @@ class TestImportMachinery:
 
     def test_restores_the_sys_path_type(self):
         assert type(sys.path) is list
+
+    def test_leaves_the_module_the_loader_it_would_have_had(self):
+        """Only running the module is taken over, so everything else the loader
+        answers for is still answered by the one the module would have had."""
+        module = self.package.import_module("main")
+        assert module.main.__loader__.get_filename() == module.main.__file__
 
 
 class TestMultipleInstances:
