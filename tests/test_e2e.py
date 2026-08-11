@@ -72,6 +72,28 @@ class SampleProject:
                 """
             },
             {
+                # a name of its own, so that reaching it through the package
+                # that holds it is not the same as reaching the package
+                "path": "submodule/deeper.py",
+                "content": f"""
+                    DEEPER_VERSION = "{self.version}"
+                """
+            },
+            {
+                "path": "uses_dotted_module.py",
+                "content": """
+                    from submodule.deeper import DEEPER_VERSION
+                """
+            },
+            {
+                "path": "imports_dotted_module.py",
+                "content": """
+                    import submodule.deeper
+
+                    DEEPER_VERSION = submodule.deeper.DEEPER_VERSION
+                """
+            },
+            {
                 # a directory down, so no finder of the project answers for it
                 "path": "vendor/vendored.py",
                 "content": f"""
@@ -159,6 +181,18 @@ class TestImports:
         so an import it only reaches when called still finds its siblings."""
         hello_later = self.package.import_module("main", ["hello_later"])
         assert hello_later() == "hello later"
+
+    def test_imports_a_module_of_a_package_of_the_project(self):
+        """`from a.b import C` is served the project's `a.b`, and the object it
+        asks for is the one on `b`, not the one on `a`."""
+        version = self.package.import_module("uses_dotted_module", ["DEEPER_VERSION"])
+        assert version == self.project.version
+
+    def test_imports_a_package_of_the_project_by_its_module(self):
+        """`import a.b` binds `a`, the same as it does anywhere else, so the
+        module reaches `b` through the package that holds it."""
+        version = self.package.import_module("imports_dotted_module", ["DEEPER_VERSION"])
+        assert version == self.project.version
 
     def test_imports_through_a_relative_path(self):
         """A relative path a module puts on `sys.path` is meant as its own
