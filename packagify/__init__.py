@@ -2,7 +2,8 @@ import builtins
 import os
 import sys
 import importlib.abc
-from importlib.machinery import PathFinder
+import importlib.util
+from importlib.machinery import ModuleSpec, PathFinder
 
 
 class Packagify:
@@ -12,17 +13,23 @@ class Packagify:
 
     ```
     from packagify import Packagify
-    package = Packagify("/home/workspace/my_package")
+    package = Packagify("/home/workspace/my_package", "my_package")
     object = package.import_module("module", ["object"])
     object1, object2 = package.import_module("module", ["object1", "object2"])
     ```
     This will allow you to import modules and objects from my_package as and where it exists.
 
 
+    The name the project is imported under is given, and has nothing to do with
+    where the project sits or what its directory is called. It is the name the
+    project holds for as long as it is loaded, so no two projects of a process
+    can be given the same one.
+
     How this works:
     1. The project's directory goes on `sys.meta_path` as a finder for a package
-    of its own name, so that its modules are imported as `<directory>.<module>`
-    without the directory having to be importable from anywhere.
+    under the project's name, so that its modules are imported as
+    `<name>.<module>` without the directory having to be importable from
+    anywhere, or even having to be named like a package.
 
     2. Those modules are run by a loader that hands them an `__import__` of their
     own, so that the imports they write as though the interpreter ran from their
@@ -37,9 +44,9 @@ class Packagify:
     never replaced, and the finder only ever answers for the project's own name.
     """
 
-    def __init__(self, location):
-        self.name = os.path.basename(location)
-        _Project.install(location=location, name=self.name)
+    def __init__(self, location, name):
+        self.name = name
+        _Project.install(location=location, name=name)
 
     def import_module(self, module, from_list=()):
         """Import a module of the project, or the objects named in from_list."""
@@ -63,16 +70,25 @@ class _Project(importlib.abc.MetaPathFinder):
     def install(cls, name: str, location: str):
         """
         Idempotent installer
-        if `Project` already exists in `sys.meta_path` then return that. 
+        if `Project` already exists in `sys.meta_path` then return that.
         Otherwise, create an instance of the `Project` and add it to `sys.meta_path`.
         """
+        if "." in name:
+            raise ValueError(f"Invalid name: {name}, a project is a package of its own")
         for finder in sys.meta_path:
             if isinstance(finder, cls) and finder.__name == name:
+                if finder.__location != location:
+                    # the first finder of a name is the one that answers for it,
+                    # so a second project of that name would never be reached
+                    raise ValueError(
+                        f"Name: {name} is already taken by the project at: {finder.__location}"
+                    )
                 return finder
         if not os.path.isdir(location):
             raise ModuleNotFoundError(f"Invalid location: {location} provided for module: {name}")
         project = cls(location=location, name=name)
         sys.meta_path.insert(0, project)
+        return project
 
     def __init__(self, name: str, location: str):
         self.__location = location
@@ -80,20 +96,37 @@ class _Project(importlib.abc.MetaPathFinder):
 
     def find_spec(self, fullname, path=None, target=None):
         if fullname == self.__name:
-            # the project itself, found under its own directory's name
-            path = [os.path.dirname(self.__location)]
+            # the project itself, which is the directory under the project's
+            # name rather than under the one the directory happens to have
+            spec = self.__spec_of_the_project(fullname)
         elif fullname.startswith(f"{self.__name}."):
             # a module of the project, searched for where the project keeps it
-            path = list(path or [self.__location])
+            spec = PathFinder.find_spec(fullname, list(path or [self.__location]), target)
         else:
             return None
-        spec = PathFinder.find_spec(fullname, path, target)
         if spec is not None and hasattr(spec.loader, "exec_module"):
             spec.loader = _Loader(
                 loader=spec.loader,
                 import_func=self.__import,
                 new_path=_SysPath(sys.path, self.__location),
             )
+        return spec
+
+    def __spec_of_the_project(self, fullname):
+        """The project's own directory, as the package the project is imported as.
+
+        The spec is built rather than searched for, since the directory is not
+        named after the project and need not be importable as a package at all.
+        """
+        init = os.path.join(self.__location, "__init__.py")
+        if os.path.isfile(init):
+            # a directory that is a package of its own is loaded as one
+            return importlib.util.spec_from_file_location(
+                fullname, init, submodule_search_locations=[self.__location]
+            )
+        # a directory that is not holds its modules and nothing else to run
+        spec = ModuleSpec(fullname, None, is_package=True)
+        spec.submodule_search_locations = [self.__location]
         return spec
 
     def provides(self, name):

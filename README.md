@@ -6,14 +6,25 @@ A packaging utility to access folders that aren't suitable to be used as package
 
 ``` python
 from packagify import Packagify
-package = Packagify("/home/workspace/my_package")
+package = Packagify("/home/workspace/my_package", "my_package")
 object = package.import_module("module", ["object"])
 object1, object2 = package.import_module("module", ["object1", "object2"])
 ```
 
+The name is given rather than taken from the folder, and has nothing to do with where the folder
+sits or what it is called, so a folder that could never be written as an import is loaded the same
+as any other:
+
+``` python
+package = Packagify("/home/workspace/my package-1.2", "my_package")
+```
+
+It is the name the project holds for as long as it is loaded, so no two projects of a process can
+be given the same one.
+
 ## How this works
 
-1. The folder is registered as a [finder](https://docs.python.org/3/reference/import.html#finders-and-loaders) on `sys.meta_path`, under a package of its own name, so its modules are imported as `<folder>.<module>` without the folder having to be importable from anywhere.
+1. The folder is registered as a [finder](https://docs.python.org/3/reference/import.html#finders-and-loaders) on `sys.meta_path`, under a package of the project's name, so its modules are imported as `<name>.<module>` without the folder having to be importable from anywhere, or even having to be named like a package. The package the name stands for is built from the folder rather than searched for, so the folder is reached under the project's name whatever it is called; a folder that holds an `__init__.py` still has it run.
 
 2. Those modules are executed by a [loader](https://docs.python.org/3/reference/import.html#loaders) that hands them an `__import__` of their own, so that the imports they write as though the interpreter ran from their own directory (`import sibling`) are served out of the folder, and everything else is imported as usual. Since the import belongs to the module rather than to the interpreter, it keeps working for imports made after loading, such as one inside a function.
 
